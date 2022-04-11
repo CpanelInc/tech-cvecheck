@@ -16,12 +16,11 @@ You can pass the following options:
 If nothing is returned when you run cvecheck, then your server should be patched and not vulnerable..
 
 The steps performed  are:
+
     1) Is the package installed? (boolean true or false). If false, continue with next package.
-    2) If true, then check if it's a kernel or linux-header package (boolean true or false).
-       kernel/linux-header packages require a name change to the package name.
+    2) If true, then check if it's a kernel or linux-header package (boolean true or false).  kernel/linux-header packages require a name change to the package name.
 
     3) Check if the CVE ID from the known exploit is listed in the packages changelog (boolean true or false).
-    4) If so, move on to the next package. If not, check the version of the installed package and see if it
-       is greater than to the patched version.
+    4) If so, move on to the next package. If not, check the version of the installed package and see if it is greater than to the patched version.
     5) If so, then not vulnerable.  If not, then list it as possibly being vulnerable.
 
