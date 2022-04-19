@@ -338,7 +338,7 @@ sub is_installed {
     my $pkgversion=0;
     if ( $distro eq 'ubuntu' ) {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
-        my $installed_package=Cpanel::SafeRun::Timed::timedsaferun( 0, 'dpkg-query', '-W', '-f=${binary:Package}\n',     $tcPkg );
+        my $installed_package=Cpanel::SafeRun::Timed::timedsaferun( 0, 'dpkg-query', '-W', '-f=${binary:Package}\n', $tcPkg );
         close( STDERR ) if ( ! $debug );
         if ( $installed_package ) {
             $is_installed=1;
