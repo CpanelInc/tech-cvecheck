@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.7";
+my $vers="1.0.8";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -108,7 +108,7 @@ if ( $file_option eq 'local' ) {
         print BOLD YELLOW "Opening local $cvedata_filename file\n" if ( $debug );
     }
     else {
-        $file_option eq 'remote';
+        $file_option='remote';
     }
 }
 
@@ -179,6 +179,16 @@ foreach my $line( @{ $data } ) {
     my $notvuln = $line->{Patched_Version};
     my $os_vuln = $line->{OS_Vulnerable};
     my $url = $line->{Link};
+    if ( $distro eq 'ubuntu' ) {
+        if ( $type eq 'rpm' ) {
+            next;
+        }
+    }
+    else {
+        if ( $type eq 'apt' ) {
+            next;
+        }
+    }
     if ( $package ) {
         next unless( $pkg =~ m/$pkgtocheck/ );
         print MAGENTA "Checking only for " . BOLD YELLOW $pkgtocheck . "\n" if ( $debug || $verbose && $show == 1 );
@@ -190,18 +200,6 @@ foreach my $line( @{ $data } ) {
         $show++;
     }
     print BOLD WHITE "============================== [ " . YELLOW $pkg . BOLD WHITE " ] ====================================\n" if ( $debug || $verbose );
-    if ( $distro eq 'ubuntu' ) {
-        if ( $type eq 'rpm' ) {
-            print CYAN "Skipping " . YELLOW $pkg . CYAN " checks because this OS is " . GREEN ucfirst( $distro ) . CYAN " and type is " . MAGENTA "RPM\n" if ( $debug || $verbose );
-            next;
-        }
-    }
-    else {
-        if ( $type eq 'apt' ) {
-            print CYAN "Skipping " . YELLOW $pkg . CYAN " checks because this OS is " . RED ucfirst( $distro ) . CYAN " and type is " . MAGENTA "APT\n" if ( $debug || $verbose );
-            next;
-        }
-    }
     if ( is_os_vulnerable( $os_vuln ) ==0 ) {
         print CYAN "Skipping " . YELLOW $pkg . CYAN " checks because this OS is " . GREEN "NOT vulnerable\n" if ( $debug || $verbose );
         next;
