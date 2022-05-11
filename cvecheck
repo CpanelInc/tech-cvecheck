@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.8";
+my $vers="1.0.9";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -170,7 +170,7 @@ if ( $cveid ) {
     $cvetocheck = $cveid;
 }
 
-my $show=1;
+my $show=0;
 
 foreach my $line( @{ $data } ) {
     my $type = $line->{Package_Type};
@@ -191,12 +191,12 @@ foreach my $line( @{ $data } ) {
     }
     if ( $package ) {
         next unless( $pkg =~ m/$pkgtocheck/ );
-        print MAGENTA "Checking only for " . BOLD YELLOW $pkgtocheck . "\n" if ( $debug || $verbose && $show == 1 );
+        print MAGENTA "Checking only for " . BOLD YELLOW $pkgtocheck . "\n" if ( $debug && $show == 0 || $verbose && $show == 0 );
         $show++;
     }
     if ( $cveid ) {
         next unless( $cve =~ m/$cvetocheck/ );
-        print MAGENTA "Checking only for " . BOLD YELLOW $cvetocheck . "\n" if ( $debug || $verbose && $show == 1 );
+        print MAGENTA "Checking only for " . BOLD YELLOW $cvetocheck . "\n" if ( $debug && $show == 0 || $verbose && $show == 0 );
         $show++;
     }
     print BOLD WHITE "============================== [ " . YELLOW $pkg . BOLD WHITE " ] ====================================\n" if ( $debug || $verbose );
@@ -221,7 +221,6 @@ foreach my $line( @{ $data } ) {
     chomp( my $pkgver = get_pkg_version( $pkg ) );
     if ( $pkg =~ m{openssl} ) {
         next unless ( $pkgver =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );
-        my $original_pkgver=$pkgver;
         my ( $maj, $min, $patch ) = ( $1, $2, $3 );
         # If we map the alphas into a number and sum the values the version will be compatible with version_compare() 
         # and save us a lot of trouble, i.e. h=8, m=13, and za=27
@@ -230,13 +229,9 @@ foreach my $line( @{ $data } ) {
         if ($4) { $sub += $al2num{ lc($4) } }
         if ($5) { $sub += $al2num{ lc($5) } }
         $pkgver = join( '.', $maj, $min, $patch, $sub );
-        chomp( $pkgver );
-        print GREEN "$original_pkgver\n" if ( $debug || $verbose );
     }
-    else {
-        chomp( $pkgver );
-        print GREEN "$pkgver\n" if ( $debug || $verbose );
-    }
+    chomp( $pkgver );
+    print GREEN "$pkgver\n" if ( $debug || $verbose );
 
     # check changelog for the CVE
     print CYAN "Checking to see if " . BOLD RED $cve . CYAN " for " . YELLOW $pkg . CYAN " is in the changelogs: " if ( $debug || $verbose );
@@ -359,10 +354,11 @@ sub get_pkg_version {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
         $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'dpkg-query', '-W', '-f=${Version}\n', "$tcPkg" );
         close( STDERR ) if ( ! $debug );
+        $pkgversion =~ s/(\.cpanel|\.cloudlinux|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*)//g;
     }
     else {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
-        $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-q', "$tcPkg" );
+        $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-q', '--queryformat', '%{Version}', "$tcPkg" );
         close( STDERR ) if ( ! $debug );
     }
     if ( $gl_is_kernel == 0 ) {
