@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.9";
+my $vers="1.0.10";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -204,23 +204,24 @@ foreach my $line( @{ $data } ) {
         print CYAN "Skipping " . YELLOW $pkg . CYAN " checks because this OS is " . GREEN "NOT vulnerable\n" if ( $debug || $verbose );
         next;
     }
-    # Check if package is kernel or linux-headers (if so, uname -r must be added)
-    print CYAN "Checking if " . YELLOW $pkg . " is a kernel/linux-header package: " if ( $debug || $verbose );
-    my $pkg1 = is_kernel( $pkg );        ## Checks to see if $pkg is a kernel or linux-headers pacakge!
-    my $is_kernel = ( $pkg1 =~ m{kernel|linux-header} ) ? "Yes" : "No";
-    print GREEN $is_kernel . "\n" if ( $debug || $verbose );
-    $pkg=$pkg1;
     # Check if package is installed
     print CYAN "Checking if " . YELLOW $pkg . " is installed: " if ( $debug || $verbose );
     my $installed = is_installed( $pkg );
     my $is_installed = ( $installed ) ? "Yes" : "No";
     print GREEN $is_installed . "\n" if ( $debug || $verbose );
     next unless( $installed );
+    # Check if package is kernel or linux-headers (if so, uname -r must be added)
+    print CYAN "Checking if " . YELLOW $pkg . " is a kernel/linux-header package: " if ( $debug || $verbose );
+    my $pkg1 = is_kernel( $pkg );        ## Checks to see if $pkg is a kernel or linux-headers pacakge!
+    my $is_kernel = ( $pkg1 =~ m{kernel|linux-header} ) ? "Yes" : "No";
+    print GREEN $is_kernel . "\n" if ( $debug || $verbose );
+    $pkg=$pkg1;
     # If we get here, it is installed, now get the version number
     print CYAN "Getting version number of " . YELLOW $pkg . ": " if ( $debug || $verbose );
     chomp( my $pkgver = get_pkg_version( $pkg ) );
     if ( $pkg =~ m{openssl} ) {
         next unless ( $pkgver =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );
+        print WHITE "OpenSSL detected, converting version $pkgver to digits only!: " if ( $debug || $verbose );
         my ( $maj, $min, $patch ) = ( $1, $2, $3 );
         # If we map the alphas into a number and sum the values the version will be compatible with version_compare() 
         # and save us a lot of trouble, i.e. h=8, m=13, and za=27
