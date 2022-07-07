@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.10";
+my $vers="1.0.11";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -179,18 +179,8 @@ foreach my $line( @{ $data } ) {
     my $notvuln = $line->{Patched_Version};
     my $os_vuln = $line->{OS_Vulnerable};
     my $url = $line->{Link};
-    if ( $distro eq 'ubuntu' ) {
-        if ( $type eq 'rpm' ) {
-            next;
-        }
-    }
-    else {
-        if ( $type eq 'apt' ) {
-            next;
-        }
-    }
     if ( $package ) {
-        next unless( $pkg =~ m/$pkgtocheck/ );
+        next unless( $pkg eq $pkgtocheck );
         print MAGENTA "Checking only for " . BOLD YELLOW $pkgtocheck . "\n" if ( $debug && $show == 0 || $verbose && $show == 0 );
         $show++;
     }
@@ -199,8 +189,20 @@ foreach my $line( @{ $data } ) {
         print MAGENTA "Checking only for " . BOLD YELLOW $cvetocheck . "\n" if ( $debug && $show == 0 || $verbose && $show == 0 );
         $show++;
     }
-    print BOLD WHITE "============================== [ " . YELLOW $pkg . BOLD WHITE " ] ====================================\n" if ( $debug || $verbose );
-    if ( is_os_vulnerable( $os_vuln ) ==0 ) {
+    print BOLD WHITE "==================== [ " . YELLOW $pkg . " / " . $cve . BOLD WHITE " ] ====================\n" if ( $debug || $verbose );
+    if ( $distro eq 'ubuntu' ) {
+        if ( $type eq 'rpm' ) {
+            print CYAN "Skipping " . YELLOW $pkg . CYAN " checks because package type is RPM based and this is Ubuntu\n" if ( $debug || $verbose );
+            next;
+        }
+    }
+    else {
+        if ( $type eq 'apt' ) {
+            print CYAN "Skipping " . YELLOW $pkg . CYAN " checks because package type is APT based and this is not Ubuntu\n" if ( $debug || $verbose );
+            next;
+        }
+    }
+    if ( is_os_vulnerable( $os_vuln ) == 0 ) {
         print CYAN "Skipping " . YELLOW $pkg . CYAN " checks because this OS is " . GREEN "NOT vulnerable\n" if ( $debug || $verbose );
         next;
     }
@@ -237,7 +239,7 @@ foreach my $line( @{ $data } ) {
     # check changelog for the CVE
     print CYAN "Checking to see if " . BOLD RED $cve . CYAN " for " . YELLOW $pkg . CYAN " is in the changelogs: " if ( $debug || $verbose );
     my $found_in_changelog = found_in_changelog( $pkg, $cve );
-    my $in_changelog = ( $found_in_changelog ) ? "Yes" : "No";
+    my $in_changelog = ( $found_in_changelog ) ? "Yes - Patched" : "No";
     print GREEN $in_changelog . "\n" if ( $debug || $verbose );
     next unless( ! $found_in_changelog );
 
