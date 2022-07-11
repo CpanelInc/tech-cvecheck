@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.11";
+my $vers="1.0.12";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -90,22 +90,22 @@ if ( $cvedata ) {
     chomp($file_option);
     if ( $file_option eq 'local' ) {
         if ( -s 'cve_data.json' ) {
-            print CYAN "Local $cvedata_filename file exists.\n" if ( $debug );
+            print CYAN "Local $cvedata_filename file exists.\n" if ( $debug || $verbose );
         }
         else {
-            print RED "Local $cvedata_filename file does not exist. Attempting remote...\n" if ( $debug );
+            print RED "Local $cvedata_filename file does not exist. Attempting remote...\n" if ( $debug || $verbose );
             $file_option='remote';
         }
     }
     else {
-        print CYAN "Downloading $cvedata_filename ...\n" if ( $debug );
+        print CYAN "Downloading $cvedata_filename ...\n" if ( $debug || $verbose );
         $file_option='remote';
     }
 }
 
 if ( $file_option eq 'local' ) {
     if ( -s $cvedata_filename ) {
-        print BOLD YELLOW "Opening local $cvedata_filename file\n" if ( $debug );
+        print BOLD YELLOW "Opening local $cvedata_filename file\n" if ( $debug || $verbose );
     }
     else {
         $file_option='remote';
@@ -123,7 +123,7 @@ sub get_temp_filename {
 
 if ( $file_option eq 'remote' ) {
     $cvedata_filename = get_temp_filename();
-    print BOLD YELLOW "Downloading $cvedata_filename file from remote location\n" if ( $debug );
+    print BOLD YELLOW "Downloading $cvedata_filename file from remote location\n" if ( $debug || $verbose );
     my $url = URI->new( 'https://raw.githubusercontent.com/CpanelInc/tech-CSI/master/cve_data.json');
     my $ua;
     my $res;
@@ -153,10 +153,10 @@ if ( $list ) {
     print MAGENTA "The cve_data.json file contains the following data...\n";
     foreach my $line( @{ $data } ) {
         print BOLD WHITE "============================== [ " . YELLOW $line->{Package_Name} . BOLD WHITE " ] ====================================\n";
-        print CYAN "Package Type: " . YELLOW $line->{Package_Type} . "\n";
         print CYAN "CVE-ID: " . YELLOW $line->{CVE_ID} . "\n";
         print CYAN "Vulnerable in which OS: " . YELLOW $line->{OS_Vulnerable} . "\n";
         print CYAN "Patched in version: " . YELLOW $line->{Patched_Version} . "\n";
+        print CYAN "Link for addtional info: " . YELLOW $line->{Link} . "\n" unless( $line->{Link} eq "" );;
     }
     print "\n";
     exit;
@@ -173,12 +173,11 @@ if ( $cveid ) {
 my $show=0;
 
 foreach my $line( @{ $data } ) {
-    my $type = $line->{Package_Type};
     my $pkg = $line->{Package_Name};
     my $cve = $line->{CVE_ID};
     my $notvuln = $line->{Patched_Version};
     my $os_vuln = $line->{OS_Vulnerable};
-    my $url = $line->{Link};
+    my $link = $line->{Link};
     if ( $package ) {
         next unless( $pkg eq $pkgtocheck );
         print MAGENTA "Checking only for " . BOLD YELLOW $pkgtocheck . "\n" if ( $debug && $show == 0 || $verbose && $show == 0 );
@@ -190,18 +189,6 @@ foreach my $line( @{ $data } ) {
         $show++;
     }
     print BOLD WHITE "==================== [ " . YELLOW $pkg . " / " . $cve . BOLD WHITE " ] ====================\n" if ( $debug || $verbose );
-    if ( $distro eq 'ubuntu' ) {
-        if ( $type eq 'rpm' ) {
-            print CYAN "Skipping " . YELLOW $pkg . CYAN " checks because package type is RPM based and this is Ubuntu\n" if ( $debug || $verbose );
-            next;
-        }
-    }
-    else {
-        if ( $type eq 'apt' ) {
-            print CYAN "Skipping " . YELLOW $pkg . CYAN " checks because package type is APT based and this is not Ubuntu\n" if ( $debug || $verbose );
-            next;
-        }
-    }
     if ( is_os_vulnerable( $os_vuln ) == 0 ) {
         print CYAN "Skipping " . YELLOW $pkg . CYAN " checks because this OS is " . GREEN "NOT vulnerable\n" if ( $debug || $verbose );
         next;
@@ -248,7 +235,7 @@ foreach my $line( @{ $data } ) {
     chomp($pkgver);
     chomp($notvuln);
     print CYAN "Checking if " . YELLOW $pkgver . " " . MAGENTA $op . " " . YELLOW $notvuln . ": " if ( $debug || $verbose );
-    my $vercmp = ( version_compare( $pkgver, $op, $notvuln ) ) ? "Yes" : "No";
+    my $vercmp = ( version_compare( $pkgver, $op, $notvuln ) ) ? "Yes - Patched" : "No";
     print GREEN $vercmp . "\n" if ( $debug || $verbose );
     next if ( version_compare( $pkgver, $op, $notvuln ) );
     my @letters = ("a".."z");
@@ -258,6 +245,9 @@ foreach my $line( @{ $data } ) {
         $pkgver = join( '.', $maj, $min, $patch, $sub1 );
     }
     print CYAN "\tVersion " . YELLOW $pkgver . CYAN " of the " . GREEN $pkg . CYAN " package is " . RED "Vulnerable " . CYAN "to " . YELLOW $cve . "\n";
+    if ( $link ne "" ) {
+        print CYAN "\nSee: " . YELLOW $link . "\n";
+    }
 }
 
 if ( $file_option eq 'remote' ) {
