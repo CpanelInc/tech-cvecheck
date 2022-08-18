@@ -221,7 +221,14 @@ foreach my $line( @{ $data } ) {
         $pkgver = join( '.', $maj, $min, $patch, $sub );
     }
     chomp( $pkgver );
-    print GREEN "$pkgver\n" if ( $debug || $verbose );
+    if ( $pkgver eq "" ) {
+        print RED "\n\t\\_ WARNING! - Version undefined/missing for $pkg\n";
+        print MAGENTA "\t\\_ THIS SHOULD NOT BE POSSIBLE IF THE PACKAGE IS PROPERLY INSTALLED! - Exiting.\n";
+        exit;
+    }
+    else {
+        print GREEN "$pkgver\n" if ( $debug || $verbose );
+    }
 
     # check changelog for the CVE
     print CYAN "Checking to see if " . BOLD RED $cve . CYAN " for " . YELLOW $pkg . CYAN " is in the changelogs: " if ( $debug || $verbose );
@@ -303,10 +310,16 @@ sub found_in_changelog {
     my $in_chglog=0;
     my $in_chglog1=0;
     if ($distro eq "ubuntu" ) {
-        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
-        $in_chglog1 = ( Cpanel::SafeRun::Timed::timedsaferun( 0, 'zgrep', '-E', "$tcCVE", "/usr/share/doc/$tcPkg/changelog.Debian.gz" ) ) ? 1 : 0;
-        close( STDERR ) if ( ! $debug );
-        $in_chglog=1 unless( $in_chglog1 == 0 );
+        if ( ! -f "/usr/share/doc/$tcPkg/changelog.Debian.gz" ) {
+            print RED "\n\t\\_ WARNING! - /usr/share/doc/$tcPkg/changelog.Debian.gz IS MISSING!!! - ";
+            $in_chglog1=0;
+        }
+        else {
+            open( STDERR, '>', '/dev/null' ) if ( ! $debug );
+            $in_chglog1 = ( Cpanel::SafeRun::Timed::timedsaferun( 0, 'zgrep', '-E', "$tcCVE", "/usr/share/doc/$tcPkg/changelog.Debian.gz" ) ) ? 1 : 0;
+            close( STDERR ) if ( ! $debug );
+            $in_chglog=1 unless( $in_chglog1 == 0 );
+        }
     }
     else {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
