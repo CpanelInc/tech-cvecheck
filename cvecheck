@@ -360,11 +360,10 @@ sub get_pkg_version {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
         $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'dpkg-query', '-W', '-f=${Version}\n', "$tcPkg" );
         close( STDERR ) if ( ! $debug );
-        $pkgversion =~ s/(\.cpanel|\.cloudlinux|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*)//g;
+        #$pkgversion =~ s/(\.cpanel|\.cloudlinux|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*)//g;
     }
     else {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
-		#$pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-q', '--queryformat', '%{Version}', "$tcPkg" );
         $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-q', '--queryformat', '%{Version}-%{Release}', "$tcPkg" );
         close( STDERR ) if ( ! $debug );
     }
@@ -373,12 +372,12 @@ sub get_pkg_version {
     }
     chomp($pkgversion);
     return $pkgversion if ( $pkgversion =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );      ## openssl (contains letters  in the version number)
-    $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*|\.el.*|\+.*)//g;
     $pkgversion =~ s/\-/\./g;
     $pkgversion =~ s/^\.//;
     $pkgversion =~ s/^\.//;
     $pkgversion =~ s/^\-//;
     $pkgversion =~ s/^\-//;
+    $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|ubuntu.*|\.cp108.*|\.cp98.*|\.cp11.*|\.el.*|\+.*)//g;
     return $pkgversion;
 }
 
