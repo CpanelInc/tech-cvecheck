@@ -43,6 +43,11 @@ my $help;
 my $list;
 my $OPT_TIMEOUT;
 
+
+# Create Global List to refer back to so we can stop calling exec() repeatedly & speed this thing up.
+# $pkg_list here is going to be an anonymous array so use it with @{$pkg_list}
+my $pkg_list = _get_pkg_list();
+
 GetOptions(
     'debug'       => \$debug,
     'verbose'     => \$verbose,
@@ -251,6 +256,7 @@ foreach my $line( @{ $data } ) {
         my $sub1 = $letters[$sub -1]; 
         $pkgver = join( '.', $maj, $min, $patch, $sub1 );
     }
+
     print CYAN "\tVersion " . YELLOW $pkgver . CYAN " of the " . GREEN $pkg . CYAN " package is " . RED "Vulnerable " . CYAN "to " . YELLOW $cve . "\n";
     if ( $link ne "" ) {
         print CYAN "\nSee: " . YELLOW $link . "\n";
@@ -332,30 +338,15 @@ sub found_in_changelog {
 
 sub is_installed {
     my $tcPkg = shift;
-    my $is_installed=0;
-    my $pkgversion=0;
-    if ( $distro eq 'ubuntu' ) {
-        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
-        my $installed_package=Cpanel::SafeRun::Timed::timedsaferun( 0, 'dpkg-query', '-W', '-f=${binary:Package}\n', $tcPkg );
-        close( STDERR ) if ( ! $debug );
-        if ( $installed_package ) {
-            $is_installed=1;
-        }
-        return $is_installed;
-    }
-    else {
-        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
-        my $is_installed1=Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-q', $tcPkg );
-        close( STDERR ) if ( ! $debug );
-        chomp($is_installed1);
-        my $is_installed = ! grep { /is not installed/ } $is_installed1;
-        return $is_installed;
-    }
+
+    my $is_installed = grep{ /${tcPkg}/ } @{$pkg_list};
+    return $is_installed ? 1 : 0;
 }
 
 sub get_pkg_version {
     my $tcPkg = shift;
     my $pkgversion;
+    my $regex = qr{\.(x86_64|cpanel|cloudlinux|deb.*|noarch|ubuntu.*|cp\d{2,3}\.*|el.*|\w\+\.*)};
     if ( $distro eq 'ubuntu' ) {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
         $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'dpkg-query', '-W', '-f=${Version}\n', "$tcPkg" );
@@ -370,10 +361,8 @@ sub get_pkg_version {
         $pkgversion =~ s/$tcPkg//g;
     }
     chomp($pkgversion);
-    return $pkgversion if ( $pkgversion =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );      ## openssl (contains letters  in the version number)
-    $pkgversion =~ s/\-/\./g;
-    $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|ubuntu.*|\.cp108.*|\.cp98.*|\.cp11.*|\.el.*|\+.*)//g;
-    return $pkgversion;
+    return $pkgversion if ( $pkgversion =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );      ## openssl (contains letters  in the version number) 
+    return $pkgversion =~ s{$regex}{}g ? $pkgversion : 0;
 }
 
 sub version_compare {
@@ -417,3 +406,17 @@ sub _version_cmp {
     return $a1 <=> $a2 || $b1 <=> $b2 || $c1 <=> $c2 || $d1 <=> $d2;
 }
 
+sub _get_pkg_list {
+    my $pkg_list = [];
+    if ( $distro eq 'ubuntu' ) {
+        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
+        @{$pkg_list} = split( /\n/, Cpanel::SafeRun::Timed::timedsaferun( 0, 'apt', 'list', '--installed' ) );
+        close( STDERR ) if ( ! $debug );
+    }
+    else {
+        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
+        @{$pkg_list} = split( /\n/, Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-qa' ) );
+        close( STDERR ) if ( ! $debug );
+    }
+    return $pkg_list;
+}
