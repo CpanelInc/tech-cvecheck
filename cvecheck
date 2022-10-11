@@ -356,11 +356,11 @@ sub is_installed {
 sub get_pkg_version {
     my $tcPkg = shift;
     my $pkgversion;
+    my $regex = qr{\.(x86_64|cpanel|cloudlinux|deb.*|noarch|ubuntu.*|cp\d{2,3}\.*|el.*|\w\+\.*)};
     if ( $distro eq 'ubuntu' ) {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
         $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'dpkg-query', '-W', '-f=${Version}\n', "$tcPkg" );
         close( STDERR ) if ( ! $debug );
-        #$pkgversion =~ s/(\.cpanel|\.cloudlinux|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*)//g;
     }
     else {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
@@ -371,10 +371,8 @@ sub get_pkg_version {
         $pkgversion =~ s/$tcPkg//g;
     }
     chomp($pkgversion);
-    return $pkgversion if ( $pkgversion =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );      ## openssl (contains letters  in the version number)
-    $pkgversion =~ s/\-/\./g;
-    $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|ubuntu.*|\.cp108.*|\.cp98.*|\.cp11.*|\.el.*|\+.*)//g;
-    return $pkgversion;
+    return $pkgversion if ( $pkgversion =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );      ## openssl (contains letters  in the version number) 
+    return $pkgversion =~ s{$regex}{}g ? $pkgversion : 0;
 }
 
 sub version_compare {
