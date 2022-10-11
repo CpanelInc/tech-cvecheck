@@ -360,7 +360,6 @@ sub get_pkg_version {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
         $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'dpkg-query', '-W', '-f=${Version}\n', "$tcPkg" );
         close( STDERR ) if ( ! $debug );
-        #$pkgversion =~ s/(\.cpanel|\.cloudlinux|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*)//g;
     }
     else {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
