@@ -209,7 +209,7 @@ foreach my $line( @{ $data } ) {
     my $pkg1 = is_kernel( $pkg );        ## Checks to see if $pkg is a kernel or linux-headers pacakge!
     my $is_kernel = ( $pkg1 =~ m{kernel|linux-header} ) ? "Yes" : "No";
     print GREEN $is_kernel . "\n" if ( $debug || $verbose );
-
+    $pkg=$pkg1;
     # If we get here, it is installed, now get the version number
     print CYAN "Getting version number of " . YELLOW $pkg . ": " if ( $debug || $verbose );
     chomp( my $pkgver = get_pkg_version( $pkg ) );
@@ -339,24 +339,33 @@ sub found_in_changelog {
 sub is_installed {
     my $tcPkg = shift;
 
-    my $is_installed = grep{ /${tcPkg}/ } @{$pkg_list};
+    my $is_installed = grep{ /^${tcPkg}/ } @{$pkg_list};
     return $is_installed ? 1 : 0;
 }
 
 sub get_pkg_version {
     my $tcPkg = shift;
-    my $results = [];
-    my $regex = qr{\.(x86_64|cpanel|(\d\.){2,3}cpanel|cloudlinux|deb.*|noarch|ubuntu.*|cp\d{2,3}\.*|el.*|\w\+\.*)||~el\d};
-    @{$results} = grep{ /^($tcPkg)-\d+/ } @{$pkg_list};
-    @{$results} = grep { s/$regex//g }  @{$results};
-    my $pkgversion = @{$results}[0];
-    $pkgversion =~ s/$tcPkg-//g;
-    $pkgversion =~ s/-\d+$//g;
+    my $pkgversion;
+    #my $regex = qr{\.(x86_64|cpanel|cloudlinux|deb.*|noarch|ubuntu.*|cp\d{2,3}\.*|el.*|\w\+\.*)};
+    my $regex = qr{\.(P2|el7|el8|x86_64|cpanel|cloudlinux|deb.*|noarch|ubuntu.*|cp\d{2,5}\.*|\w\+\.*)};
+    if ( $distro eq 'ubuntu' ) {
+        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
+        $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'dpkg-query', '-W', '-f=${Version}\n', "$tcPkg" );
+        close( STDERR ) if ( ! $debug );
+    }
+    else {
+        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
+        $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-q', '--queryformat', '%{Version}-%{Release}', "$tcPkg" );
+        close( STDERR ) if ( ! $debug );
+    }
+    $pkgversion =~ s/\-/\./g;
+    $pkgversion =~ s/\_/\./g;
     if ( $gl_is_kernel == 0 ) {
-        $pkgversion =~ s/$tcPkg-//g;
+        $pkgversion =~ s/$tcPkg//g;
     }
     chomp($pkgversion);
-    return $pkgversion;
+    return $pkgversion if ( $pkgversion =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );      ## openssl (contains letters  in the version number) 
+    return $pkgversion =~ s{$regex}{}g ? $pkgversion : $pkgversion;
 }
 
 sub version_compare {
@@ -392,13 +401,14 @@ sub version_compare {
 
 sub _version_cmp {
     my ( $first, $second ) = @_;
-    my ( $a1,    $b1, $c1, $d1 ) = split /[\._]/, $first;
-    my ( $a2,    $b2, $c2, $d2 ) = split /[\._]/, $second;
-    for my $ref ( \$a1, \$b1, \$c1, \$d1, \$a2, \$b2, \$c2, \$d2, ) {    # Fill empties with 0
+    my ( $a1,    $b1, $c1, $d1, $e1, $f1 ) = split /[\._]/, $first;
+    my ( $a2,    $b2, $c2, $d2, $e2, $f2 ) = split /[\._]/, $second;
+    for my $ref ( \$a1, \$b1, \$c1, \$d1, \$e1, \$f1, \$a2, \$b2, \$c2, \$d2, \$e2, \$f2,) {    # Fill empties with 0
         $$ref = 0 unless defined $$ref;
     }
-    return $a1 <=> $a2 || $b1 <=> $b2 || $c1 <=> $c2 || $d1 <=> $d2;
+    return $a1 <=> $a2 || $b1 <=> $b2 || $c1 <=> $c2 || $d1 <=> $d2 || $e1 <=> $e2 || $f1 <=> $f2;
 }
+
 
 sub _get_pkg_list {
     my $pkg_list = [];
