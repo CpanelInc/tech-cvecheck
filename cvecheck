@@ -209,7 +209,7 @@ foreach my $line( @{ $data } ) {
     my $pkg1 = is_kernel( $pkg );        ## Checks to see if $pkg is a kernel or linux-headers pacakge!
     my $is_kernel = ( $pkg1 =~ m{kernel|linux-header} ) ? "Yes" : "No";
     print GREEN $is_kernel . "\n" if ( $debug || $verbose );
-    $pkg=$pkg1;
+
     # If we get here, it is installed, now get the version number
     print CYAN "Getting version number of " . YELLOW $pkg . ": " if ( $debug || $verbose );
     chomp( my $pkgver = get_pkg_version( $pkg ) );
@@ -345,24 +345,18 @@ sub is_installed {
 
 sub get_pkg_version {
     my $tcPkg = shift;
-    my $pkgversion;
-    my $regex = qr{\.(x86_64|cpanel|cloudlinux|deb.*|noarch|ubuntu.*|cp\d{2,3}\.*|el.*|\w\+\.*)};
-    if ( $distro eq 'ubuntu' ) {
-        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
-        $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'dpkg-query', '-W', '-f=${Version}\n', "$tcPkg" );
-        close( STDERR ) if ( ! $debug );
-    }
-    else {
-        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
-        $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-q', '--queryformat', '%{Version}-%{Release}', "$tcPkg" );
-        close( STDERR ) if ( ! $debug );
-    }
+    my $results = [];
+    my $regex = qr{\.(x86_64|cpanel|(\d\.){2,3}cpanel|cloudlinux|deb.*|noarch|ubuntu.*|cp\d{2,3}\.*|el.*|\w\+\.*)||~el\d};
+    @{$results} = grep{ /^($tcPkg)-\d+/ } @{$pkg_list};
+    @{$results} = grep { s/$regex//g }  @{$results};
+    my $pkgversion = @{$results}[0];
+    $pkgversion =~ s/$tcPkg-//g;
+    $pkgversion =~ s/-\d+$//g;
     if ( $gl_is_kernel == 0 ) {
-        $pkgversion =~ s/$tcPkg//g;
+        $pkgversion =~ s/$tcPkg-//g;
     }
     chomp($pkgversion);
-    return $pkgversion if ( $pkgversion =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );      ## openssl (contains letters  in the version number) 
-    return $pkgversion =~ s{$regex}{}g ? $pkgversion : 0;
+    return $pkgversion;
 }
 
 sub version_compare {
