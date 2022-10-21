@@ -344,61 +344,61 @@ sub is_installed {
 }
 
 # OLD VERSION (WORKING)
-#sub get_pkg_version {
-#    my $tcPkg = shift;
-#    my $pkgversion;
-#    if ( $distro eq 'ubuntu' ) {
-#        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
-#        $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'dpkg-query', '-W', '-f=${Version}\n', "$tcPkg" );
-#        close( STDERR ) if ( ! $debug );
-#        $pkgversion =~ s/(\.cpanel|\.cloudlinux|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*)//g;
-#    }
-#    else {
-#        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
-#        $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-q', '--queryformat', '%{Version}-%{Release}', "$tcPkg" );
-#        close( STDERR ) if ( ! $debug );
-#    }
-#    if ( $gl_is_kernel == 0 ) {
-#        $pkgversion =~ s/$tcPkg//g;
-#    }
-#    chomp($pkgversion);
-#    return $pkgversion if ( $pkgversion =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );      ## openssl (contains letters  in the version number)
-#    $pkgversion =~ s/\-/\./g;
-#    #$pkgversion =~ s/^\.//;
-#    #$pkgversion =~ s/^\.//;
-#    $pkgversion =~ s/^\.\.//;
-#    #$pkgversion =~ s/^\-//;
-#    #$pkgversion =~ s/^\-//;
-#    $pkgversion =~ s/^\-\-//;
-#    $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*|\.el.*|\+.*)//g;
-#    return $pkgversion;
-#}
-
-# New version (Work in Progress)
 sub get_pkg_version {
     my $tcPkg = shift;
     my $pkgversion;
-    #my $regex = qr{\.(x86_64|cpanel|cloudlinux|deb.*|noarch|ubuntu.*|cp\d{2,3}\.*|el.*|\w\+\.*)};
-    my $regex = qr{\.(P2|el7|el8|x86_64|cpanel|cloudlinux|deb.*|noarch|ubuntu.*|cp\d{2,5}\.*|\w\+\.*)};
     if ( $distro eq 'ubuntu' ) {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
         $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'dpkg-query', '-W', '-f=${Version}\n', "$tcPkg" );
         close( STDERR ) if ( ! $debug );
+        $pkgversion =~ s/(\.cpanel|\.cloudlinux|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*)//g;
     }
     else {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
         $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-q', '--queryformat', '%{Version}-%{Release}', "$tcPkg" );
         close( STDERR ) if ( ! $debug );
     }
-    $pkgversion =~ s/\-/\./g;
-    $pkgversion =~ s/\_/\./g;
     if ( $gl_is_kernel == 0 ) {
         $pkgversion =~ s/$tcPkg//g;
     }
     chomp($pkgversion);
-    return $pkgversion if ( $pkgversion =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );      ## openssl (contains letters  in the version number) 
-    return $pkgversion =~ s{$regex}{}g ? $pkgversion : $pkgversion;
+    return $pkgversion if ( $pkgversion =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );      ## openssl (contains letters  in the version number)
+    $pkgversion =~ s/\-/\./g;
+    #$pkgversion =~ s/^\.//;
+    #$pkgversion =~ s/^\.//;
+    $pkgversion =~ s/^\.\.//;
+    #$pkgversion =~ s/^\-//;
+    #$pkgversion =~ s/^\-//;
+    $pkgversion =~ s/^\-\-//;
+    $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*|\.el.*|\+.*)//g;
+    return $pkgversion;
 }
+
+# New version (Work in Progress)
+#sub get_pkg_version {
+#    my $tcPkg = shift;
+#    my $pkgversion;
+#    #my $regex = qr{\.(x86_64|cpanel|cloudlinux|deb.*|noarch|ubuntu.*|cp\d{2,3}\.*|el.*|\w\+\.*)};
+#    my $regex = qr{\.(P2|el7|el8|x86_64|cpanel|cloudlinux|deb.*|noarch|ubuntu.*|cp\d{2,5}\.*|\w\+\.*)};
+#    if ( $distro eq 'ubuntu' ) {
+#        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
+#        $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'dpkg-query', '-W', '-f=${Version}\n', "$tcPkg" );
+#        close( STDERR ) if ( ! $debug );
+#    }
+#    else {
+#        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
+#        $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-q', '--queryformat', '%{Version}-%{Release}', "$tcPkg" );
+#        close( STDERR ) if ( ! $debug );
+#    }
+#    $pkgversion =~ s/\-/\./g;
+#    $pkgversion =~ s/\_/\./g;
+#    if ( $gl_is_kernel == 0 ) {
+#        $pkgversion =~ s/$tcPkg//g;
+#    }
+#    chomp($pkgversion);
+#    return $pkgversion if ( $pkgversion =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );      ## openssl (contains letters  in the version number) 
+#    return $pkgversion =~ s{$regex}{}g ? $pkgversion : $pkgversion;
+#}
 
 sub version_compare {
     # example: return if version_compare($ver_string, qw( >= 1.2.3.3 ));
