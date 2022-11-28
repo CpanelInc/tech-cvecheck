@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.13";
+my $vers="1.0.14";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -34,7 +34,7 @@ elsif ( Cpanel::OS->can('supported_methods') ) {
 my $distro_version = $distro_major . "." . $distro_minor;
 my $debug=0;
 my $verbose=0;
-my $cvedata;
+my $remote;
 my $package;
 my $pkgtocheck;
 my $cveid;
@@ -51,11 +51,11 @@ my $pkg_list = _get_pkg_list();
 GetOptions(
     'debug'       => \$debug,
     'verbose'     => \$verbose,
-    'cvedata=s'   => \$cvedata,
     'package=s'   => \$package,
     'cveid=s'     => \$cveid,
     'help'        => \$help,
     'list'        => \$list,
+    'remote'      => \$remote,
 );
 
 print MAGENTA "Distro: " . CYAN $distro . " [ $distro_version ]\n" if ( $debug || $verbose );
@@ -71,7 +71,7 @@ if ( $help ) {
     print YELLOW "--list - List the data within the cve_data.json file.\n";
     print YELLOW "--verbose - Shows output of every thing checked. [ default is to be quiet ]\n";
     print YELLOW "--debug - Show debug output of every thing checked. [ default is to be quiet ] --debug output may show errors.\n";
-    print YELLOW "--cvedata=local or --cvedata=remote - Use local file relative to cvecheck or download remote cve_data.json file.\n";
+    print YELLOW "--remote - If local cve_data.json file exists, it will use that otherwise it will download the current one.\n";
     print YELLOW "--package=packagename - Check only this package against our cve_data.json file.\n";
     print YELLOW "--cveid=CVE-XXXX-XXXXX - Check only this CVE ID against our cve_data.json file.\n";
     print GREEN "\nIf nothing is returned when you run cvecheck, then your server should be patched and not vulnerable..\n\n";
@@ -87,32 +87,18 @@ if ( $help ) {
     exit;
 }
 
-my $file_option='local';
+
+my $file_option = ( $remote ) ? 'remote' : 'local';
 my $cvedata_filename='cve_data.json';
 
-if ( $cvedata ) {
-    $file_option = $cvedata;
-    chomp($file_option);
-    if ( $file_option eq 'local' ) {
-        if ( -s 'cve_data.json' ) {
-            print CYAN "Local $cvedata_filename file exists.\n" if ( $debug || $verbose );
-        }
-        else {
-            print RED "Local $cvedata_filename file does not exist. Attempting remote...\n" if ( $debug || $verbose );
-            $file_option='remote';
-        }
-    }
-    else {
-        print CYAN "Downloading $cvedata_filename ...\n" if ( $debug || $verbose );
-        $file_option='remote';
-    }
-}
-
-if ( $file_option eq 'local' ) {
-    if ( -s $cvedata_filename ) {
+if ( ! $remote ) {
+    if ( -s 'cve_data.json' ) {
+        print CYAN "Local $cvedata_filename file exists.\n" if ( $debug || $verbose );
         print BOLD YELLOW "Opening local $cvedata_filename file\n" if ( $debug || $verbose );
     }
     else {
+        print CYAN "Local $cvedata_filename file does not exist. Attempting remote...\n" if ( $debug || $verbose );
+        print CYAN "Downloading $cvedata_filename ...\n" if ( $debug || $verbose );
         $file_option='remote';
     }
 }
@@ -126,7 +112,7 @@ sub get_temp_filename {
     return $fh->filename;
 }
 
-if ( $file_option eq 'remote' ) {
+if ( $file_option eq 'remote' || $remote ) {
     $cvedata_filename = get_temp_filename();
     print BOLD YELLOW "Downloading $cvedata_filename file from remote location\n" if ( $debug || $verbose );
     my $url = URI->new( 'https://raw.githubusercontent.com/CpanelInc/tech-CSI/master/cve_data.json');
@@ -343,7 +329,6 @@ sub is_installed {
     return $is_installed ? 1 : 0;
 }
 
-# OLD VERSION (WORKING)
 sub get_pkg_version {
     my $tcPkg = shift;
     my $pkgversion;
@@ -364,41 +349,11 @@ sub get_pkg_version {
     chomp($pkgversion);
     return $pkgversion if ( $pkgversion =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );      ## openssl (contains letters  in the version number)
     $pkgversion =~ s/\-/\./g;
-    #$pkgversion =~ s/^\.//;
-    #$pkgversion =~ s/^\.//;
     $pkgversion =~ s/^\.\.//;
-    #$pkgversion =~ s/^\-//;
-    #$pkgversion =~ s/^\-//;
     $pkgversion =~ s/^\-\-//;
-    $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*|\.el.*|\+.*)//g;
+    $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*|\.cp10.*|\.el.*|\+.*)//g;
     return $pkgversion;
 }
-
-# New version (Work in Progress)
-#sub get_pkg_version {
-#    my $tcPkg = shift;
-#    my $pkgversion;
-#    #my $regex = qr{\.(x86_64|cpanel|cloudlinux|deb.*|noarch|ubuntu.*|cp\d{2,3}\.*|el.*|\w\+\.*)};
-#    my $regex = qr{\.(P2|el7|el8|x86_64|cpanel|cloudlinux|deb.*|noarch|ubuntu.*|cp\d{2,5}\.*|\w\+\.*)};
-#    if ( $distro eq 'ubuntu' ) {
-#        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
-#        $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'dpkg-query', '-W', '-f=${Version}\n', "$tcPkg" );
-#        close( STDERR ) if ( ! $debug );
-#    }
-#    else {
-#        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
-#        $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-q', '--queryformat', '%{Version}-%{Release}', "$tcPkg" );
-#        close( STDERR ) if ( ! $debug );
-#    }
-#    $pkgversion =~ s/\-/\./g;
-#    $pkgversion =~ s/\_/\./g;
-#    if ( $gl_is_kernel == 0 ) {
-#        $pkgversion =~ s/$tcPkg//g;
-#    }
-#    chomp($pkgversion);
-#    return $pkgversion if ( $pkgversion =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );      ## openssl (contains letters  in the version number) 
-#    return $pkgversion =~ s{$regex}{}g ? $pkgversion : $pkgversion;
-#}
 
 sub version_compare {
     # example: return if version_compare($ver_string, qw( >= 1.2.3.3 ));
