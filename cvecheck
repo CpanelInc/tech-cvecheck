@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.14";
+my $vers="1.0.15";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -15,22 +15,9 @@ use Text::Tabs;
 $tabstop = 4;
 use File::Temp;
 my $gl_is_kernel=0;
-my $distro;
-my $distro_major;
-my $distro_minor;
-
-if ( Cpanel::OS->can('instance') ) {
-        # 96 and 98
-        $distro       = Cpanel::OS->instance->distro;
-        $distro_major = Cpanel::OS->instance->major;
-        $distro_minor = Cpanel::OS->instance->minor;
-}
-elsif ( Cpanel::OS->can('supported_methods') ) {
-        # 100+
-        $distro       = Cpanel::OS->_instance->distro;
-        $distro_major = Cpanel::OS->_instance->major;
-        $distro_minor = Cpanel::OS->_instance->minor;
-}
+my $distro       = Cpanel::OS->_instance->distro;
+my $distro_major = Cpanel::OS->_instance->major;
+my $distro_minor = Cpanel::OS->_instance->minor;
 my $distro_version = $distro_major . "." . $distro_minor;
 my $debug=0;
 my $verbose=0;
@@ -82,7 +69,9 @@ if ( $help ) {
     print GREEN "\t3) Check if the CVE ID from the known exploit is listed in the packages changelog (boolean true or false).\n";
     print GREEN "\t4) If so, move on to the next package. If not, check the version of the installed package and see if it\n";
     print GREEN "\tis greater than to the patched version.\n";
-    print GREEN "\t5) If so, then not vulnerable.  If not, then list it as possibly being vulnerable.\n";
+    print GREEN "\t5) If so, move on to the next package. If not, check the version of the installed package and see if it\n";
+    print GREEN "\tis less than to the patched version.\n";
+    print GREEN "\t6) If so, then not vulnerable.  If not, then list it as possibly being vulnerable.\n";
     print "\n";
     exit;
 }
@@ -146,7 +135,8 @@ if ( $list ) {
         print BOLD WHITE "============================== [ " . YELLOW $line->{Package_Name} . BOLD WHITE " ] ====================================\n";
         print CYAN "CVE-ID: " . YELLOW $line->{CVE_ID} . "\n";
         print CYAN "Vulnerable in which OS: " . YELLOW $line->{OS_Vulnerable} . "\n";
-        print CYAN "Patched in version: " . YELLOW $line->{Patched_Version} . "\n";
+        print CYAN "Version less than: " . YELLOW $line->{First_Vulnerable_Version} . " is NOT vulnerable\n";
+        print CYAN "Version greater than: " . YELLOW $line->{Patched_Version} . " is NOT vulnerable\n";
         print CYAN "Link for addtional info: " . YELLOW $line->{Link} . "\n" unless( $line->{Link} eq "" );;
     }
     print "\n";
@@ -166,9 +156,9 @@ my $show=0;
 foreach my $line( @{ $data } ) {
     my $pkg = $line->{Package_Name};
     my $cve = $line->{CVE_ID};
-    my $notvuln = $line->{Patched_Version};
+    my $patchedver = $line->{Patched_Version};
+    my $firstvuln = $line->{First_Vulnerable_Version};
     my $os_vuln = $line->{OS_Vulnerable};
-    my $link = $line->{Link};
     if ( $package ) {
         next unless( $pkg eq $pkgtocheck );
         print MAGENTA "Checking only for " . BOLD YELLOW $pkgtocheck . "\n" if ( $debug && $show == 0 || $verbose && $show == 0 );
@@ -190,6 +180,7 @@ foreach my $line( @{ $data } ) {
     my $is_installed = ( $installed ) ? "Yes" : "No";
     print GREEN $is_installed . "\n" if ( $debug || $verbose );
     next unless( $installed );
+
     # Check if package is kernel or linux-headers (if so, uname -r must be added)
     print CYAN "Checking if " . YELLOW $pkg . " is a kernel/linux-header package: " if ( $debug || $verbose );
     my $pkg1 = is_kernel( $pkg );        ## Checks to see if $pkg is a kernel or linux-headers pacakge!
@@ -221,21 +212,37 @@ foreach my $line( @{ $data } ) {
         print GREEN "$pkgver\n" if ( $debug || $verbose );
     }
 
+    # report first vulnerable version (if verbose or debug is enabled)
+    print CYAN "First vulnerable reported version: " . GREEN $firstvuln . "\n" if ( $debug || $verbose );
+
     # check changelog for the CVE
     print CYAN "Checking to see if " . BOLD RED $cve . CYAN " for " . YELLOW $pkg . CYAN " is in the changelogs: " if ( $debug || $verbose );
     my $found_in_changelog = found_in_changelog( $pkg, $cve );
-    my $in_changelog = ( $found_in_changelog ) ? "Yes - Patched" : "No";
+    my $in_changelog = ( $found_in_changelog ) ? "Yes - Patched" : "No " . WHITE "- Checking version numbers...";
     print GREEN $in_changelog . "\n" if ( $debug || $verbose );
     next unless( ! $found_in_changelog );
 
-    # check version against the nonvuln variable
-    my $op='>=';
-    chomp($pkgver);
-    chomp($notvuln);
-    print CYAN "Checking if " . YELLOW $pkgver . " " . MAGENTA $op . " " . YELLOW $notvuln . ": " if ( $debug || $verbose );
-    my $vercmp = ( version_compare( $pkgver, $op, $notvuln ) ) ? "Yes - Patched" : "No";
+    # check to see if version is greater than or equal to the patchedver variable
+    my $op1='>=';
+    chomp($patchedver);
+    print CYAN "Checking if " . YELLOW $pkgver . " is " . MAGENTA $op1 . " " . YELLOW $patchedver . ": " if ( $debug || $verbose );
+    my $vercmp = ( version_compare( $pkgver, $op1, $patchedver ) ) ? "Yes - Patched" : "No";
     print GREEN $vercmp . "\n" if ( $debug || $verbose );
-    next if ( version_compare( $pkgver, $op, $notvuln ) );
+    next if ( version_compare( $pkgver, $op1, $patchedver ) );
+    my @letters = ("a".."z");
+    if ( $pkg =~ m{openssl} ) {
+        my ( $maj, $min, $patch, $sub ) = ( split( /\./, $pkgver ));
+        my $sub1 = $letters[$sub -1]; 
+        $pkgver = join( '.', $maj, $min, $patch, $sub1 );
+    }
+
+    # check to see if version is less than the firstvuln variable
+    my $op2='<';
+    chomp($firstvuln);
+    print CYAN "Checking if " . YELLOW $pkgver . " is " . MAGENTA $op2 . CYAN " the first vulnerable reported version of: " . YELLOW $firstvuln . ": " if ( $debug || $verbose );
+    my $vercmp = ( version_compare( $pkgver, $op2, $firstvuln ) ) ? "Yes - Patched" : "No";
+    print GREEN $vercmp . "\n" if ( $debug || $verbose );
+    next if ( version_compare( $pkgver, $op2, $firstvuln ) );
     my @letters = ("a".."z");
     if ( $pkg =~ m{openssl} ) {
         my ( $maj, $min, $patch, $sub ) = ( split( /\./, $pkgver ));
@@ -244,9 +251,6 @@ foreach my $line( @{ $data } ) {
     }
 
     print CYAN "\tVersion " . YELLOW $pkgver . CYAN " of the " . GREEN $pkg . CYAN " package is " . RED "Vulnerable " . CYAN "to " . YELLOW $cve . "\n";
-    if ( $link ne "" ) {
-        print CYAN "\nSee: " . YELLOW $link . "\n";
-    }
 }
 
 if ( $file_option eq 'remote' ) {
@@ -319,12 +323,22 @@ sub found_in_changelog {
         close( STDERR ) if ( ! $debug );
         $in_chglog = ( grep { /$tcCVE/ } $in_chglog1 ) ? 1 : 0;
     }
+    # If not found in changelog via regular methods - See if KernelCare is installed and check using --patch-info
+    if ( $in_chglog == 0 && $gl_is_kernel == 1 ) {
+        return $in_chglog unless( -x '/usr/bin/kcarectl' );
+        print BOLD GREEN "\n\t\\_ Not found via regular changelog, KernelCare detected - Checking with --patch-info: " if ( $verbose || $debug );
+        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
+        my $patchinfo = Cpanel::SafeRun::Timed::timedsaferun(3, 'kcarectl', '--patch-info' );
+        close( STDERR ) if ( ! $debug );
+        my @patchinfo = split /\n/, $patchinfo;
+        my $in_chglog = ( grep { /$tcCVE/ } @patchinfo ) ? 1 : 0;
+        return $in_chglog;
+    }
     return $in_chglog;
 }
 
 sub is_installed {
     my $tcPkg = shift;
-
     my $is_installed = grep{ /^${tcPkg}/ } @{$pkg_list};
     return $is_installed ? 1 : 0;
 }
