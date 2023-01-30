@@ -284,6 +284,7 @@ sub is_os_vulnerable {
 
 sub is_kernel {
     my $tcPkg = shift;
+    $gl_is_kernel=0;
     if ( $tcPkg =~ m{kernel|linux-headers} ) {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
         my $uname = Cpanel::SafeRun::Timed::timedsaferun( 0, 'uname', '-r' );
