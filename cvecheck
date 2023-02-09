@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.15";
+my $vers="1.0.16";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -243,12 +243,6 @@ foreach my $line( @{ $data } ) {
     my $vercmp = ( version_compare( $pkgver, $op2, $firstvuln ) ) ? "Yes - Patched" : "No";
     print GREEN $vercmp . "\n" if ( $debug || $verbose );
     next if ( version_compare( $pkgver, $op2, $firstvuln ) );
-    my @letters = ("a".."z");
-    if ( $pkg =~ m{openssl} ) {
-        my ( $maj, $min, $patch, $sub ) = ( split( /\./, $pkgver ));
-        my $sub1 = $letters[$sub -1]; 
-        $pkgver = join( '.', $maj, $min, $patch, $sub1 );
-    }
 
     print CYAN "\tVersion " . YELLOW $pkgver . CYAN " of the " . GREEN $pkg . CYAN " package is " . RED "Vulnerable " . CYAN "to " . YELLOW $cve . "\n";
 }
