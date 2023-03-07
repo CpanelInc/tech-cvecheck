@@ -190,9 +190,9 @@ foreach my $line( @{ $data } ) {
     # If we get here, it is installed, now get the version number
     print CYAN "Getting version number of " . YELLOW $pkg . ": " if ( $debug || $verbose );
     chomp( my $pkgver = get_pkg_version( $pkg ) );
-	my $digitpkgver;
-	my $alphapkgver;
-	$digitpkgver = digit_to_alpha( $pkgver ) // '' if ( $pkg =~ m{openssl} );
+    my $digitpkgver;
+    my $alphapkgver;
+    $digitpkgver = digit_to_alpha( $pkgver ) // '' if ( $pkg =~ m{openssl} );
     chomp( $pkgver );
     if ( $pkgver eq "" ) {
         print RED "\n\t\\_ WARNING! - Version undefined/missing for $pkg\n";
@@ -200,22 +200,22 @@ foreach my $line( @{ $data } ) {
         exit;
     }
     else {
-		if ( $pkg =~ m{openssl} ) {
-        	print GREEN $pkgver . " (Converted to: " . $digitpkgver . " )\n" if ( $debug || $verbose );
-		}
-		else {
-        	print GREEN $pkgver . "\n" if ( $debug || $verbose );
-		}
+        if ( $pkg =~ m{openssl} ) {
+            print GREEN $pkgver . " (Converted to: " . $digitpkgver . " )\n" if ( $debug || $verbose );
+        }
+        else {
+            print GREEN $pkgver . "\n" if ( $debug || $verbose );
+        }
     }
 
     # report first vulnerable version (if verbose or debug is enabled)
-	$alphapkgver = alpha_to_digit( $firstvuln ) // '' if ( $pkg =~ m{openssl} );
-	if ( $pkg =~ m{openssl} ) {
-    	print CYAN "First vulnerable reported version: " . GREEN $alphapkgver . " (Converted to: " . $firstvuln . " )\n" if ( $debug || $verbose );
-	}
-	else {
-    	print CYAN "First vulnerable reported version: " . GREEN $firstvuln . "\n" if ( $debug || $verbose );
-	}
+    $alphapkgver = alpha_to_digit( $firstvuln ) // '' if ( $pkg =~ m{openssl} );
+    if ( $pkg =~ m{openssl} ) {
+        print CYAN "First vulnerable reported version: " . GREEN $alphapkgver . " (Converted to: " . $firstvuln . " )\n" if ( $debug || $verbose );
+    }
+    else {
+        print CYAN "First vulnerable reported version: " . GREEN $firstvuln . "\n" if ( $debug || $verbose );
+    }
 
     # check changelog for the CVE
     print CYAN "Checking to see if " . BOLD RED $cve . CYAN " for " . YELLOW $pkg . CYAN " is in the changelogs: " if ( $debug || $verbose );
@@ -227,12 +227,12 @@ foreach my $line( @{ $data } ) {
     # check to see if version is greater than or equal to the patchedver variable
     my $op1='>=';
     chomp($patchedver);
-	if ( $pkg =~ m{openssl} ) {
-    	print CYAN "Checking if " . YELLOW $digitpkgver . " is " . MAGENTA $op1 . " " . YELLOW $patchedver . ": " if ( $debug || $verbose );
-	}
-	else {
-    	print CYAN "Checking if " . YELLOW $pkgver . " is " . MAGENTA $op1 . " " . YELLOW $patchedver . ": " if ( $debug || $verbose );
-	}
+    if ( $pkg =~ m{openssl} ) {
+        print CYAN "Checking if " . YELLOW $digitpkgver . " is " . MAGENTA $op1 . " " . YELLOW $patchedver . ": " if ( $debug || $verbose );
+    }
+    else {
+        print CYAN "Checking if " . YELLOW $pkgver . " is " . MAGENTA $op1 . " " . YELLOW $patchedver . ": " if ( $debug || $verbose );
+    }
     my $vercmp = ( version_compare( $pkgver, $op1, $patchedver ) ) ? "Yes - Patched" : "No";
     print GREEN $vercmp . "\n" if ( $debug || $verbose );
     next if ( version_compare( $pkgver, $op1, $patchedver ) );
@@ -240,12 +240,12 @@ foreach my $line( @{ $data } ) {
     # check to see if version is less than the firstvuln variable
     my $op2='<';
     chomp($firstvuln);
-	if ( $pkg =~ m{openssl} ) {
-    	print CYAN "Checking if " . YELLOW $digitpkgver . " is " . MAGENTA $op2 . CYAN " the first vulnerable reported version of: " . YELLOW $firstvuln . ": " if ( $debug || $verbose );
-	}
-	else {
-    	print CYAN "Checking if " . YELLOW $pkgver . " is " . MAGENTA $op2 . CYAN " the first vulnerable reported version of: " . YELLOW $firstvuln . ": " if ( $debug || $verbose );
-	}
+    if ( $pkg =~ m{openssl} ) {
+        print CYAN "Checking if " . YELLOW $digitpkgver . " is " . MAGENTA $op2 . CYAN " the first vulnerable reported version of: " . YELLOW $firstvuln . ": " if ( $debug || $verbose );
+    }
+    else {
+        print CYAN "Checking if " . YELLOW $pkgver . " is " . MAGENTA $op2 . CYAN " the first vulnerable reported version of: " . YELLOW $firstvuln . ": " if ( $debug || $verbose );
+    }
     my $vercmp = ( version_compare( $pkgver, $op2, $firstvuln ) ) ? "Yes - Patched" : "No";
     print GREEN $vercmp . "\n" if ( $debug || $verbose );
     next if ( version_compare( $pkgver, $op2, $firstvuln ) );
@@ -260,9 +260,9 @@ print "\n";
 exit;
 
 sub digit_to_alpha {
-	my $tcPkgVer = shift;
-	return unless ( $tcPkgVer =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );
-	my $retPkgVer;
+    my $tcPkgVer = shift;
+    return unless ( $tcPkgVer =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );
+    my $retPkgVer;
     my ( $maj, $min, $patch ) = ( $1, $2, $3 );
     # If we map the alphas into a number and sum the values the version will be compatible with version_compare()
     # and save us a lot of trouble, i.e. h=8, m=13, and za=27
@@ -271,13 +271,13 @@ sub digit_to_alpha {
     if ($4) { $sub += $al2num{ lc($4) } }
     if ($5) { $sub += $al2num{ lc($5) } }
     $retPkgVer = join( '.', $maj, $min, $patch, $sub );
-	return $retPkgVer;
+    return $retPkgVer;
 }
 
 sub alpha_to_digit {
-	my $tcPkgVer = shift;
-	my @letters = ( "a" .. "z" );
-	my $retPkgVer;
+    my $tcPkgVer = shift;
+    my @letters = ( "a" .. "z" );
+    my $retPkgVer;
     my ( $maj, $min, $patch, $sub ) = ( split( /\./, $tcPkgVer ) );
     my $sub1 = $letters[ $sub - 1 ];
     $retPkgVer = join( '.', $maj, $min, $patch, $sub1 );
@@ -375,7 +375,7 @@ sub get_pkg_version {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
         $pkgversion=Cpanel::SafeRun::Timed::timedsaferun( 0, 'dpkg-query', '-W', '-f=${Version}\n', "$tcPkg" );
         close( STDERR ) if ( ! $debug );
-        $pkgversion =~ s/(\.cpanel|\.cloudlinux|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*)//g;
+        #$pkgversion =~ s/(\.cpanel|\.cloudlinux|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*)//g;
     }
     else {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
@@ -387,14 +387,12 @@ sub get_pkg_version {
     }
     chomp($pkgversion);
     if ( substr( $tcPkg,0,7 ) eq "cpanel-" ) {
-#    return $pkgversion if ( $pkgversion =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );      ## openssl (contains letters  in the version number)
         $pkgversion =~ s/\-/\./g;
         $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*|\.cp10.*|\.el.*|\+.*)//g;
     }
     else {
         $pkgversion =~ s/^\.\.//;
         $pkgversion =~ s/^\-\-//;
-        #$pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*|\.cp10.*|\.el.*|\+.*)//g;
         $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*|\.cp10.*|\.el.*|\+.*|\-.*)//g;
     }
     return $pkgversion;
