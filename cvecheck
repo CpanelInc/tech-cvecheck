@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.17";
+my $vers="1.0.19";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -280,7 +280,9 @@ sub alpha_to_digit {
     my $retPkgVer;
     my ( $maj, $min, $patch, $sub ) = ( split( /\./, $tcPkgVer ) );
     my $sub1 = $letters[ $sub - 1 ];
-    $retPkgVer = join( '.', $maj, $min, $patch, $sub1 );
+    #$retPkgVer = join( '.', $maj, $min, $patch, $sub1 );
+    $retPkgVer = join( '.', $maj, $min, $patch );
+    $retPkgVer .= $sub1;
 }
 
 sub is_os_vulnerable {
@@ -391,9 +393,8 @@ sub get_pkg_version {
     }
     else {
         $pkgversion =~ s/^\.\.//;
-        $pkgversion =~ s/\-/\./g;
         $pkgversion =~ s/^\-\-//;
-        $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*|\.cp10.*|\.el.*|\+.*|\-.*)//g;
+        $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|\.1ubuntu.*|ubuntu.*|\.cp98.*|\.cp11.*|\.cp10.*|\.el.*|\+.*|\-.*)//g;
     }
     return $pkgversion;
 }
