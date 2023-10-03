@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.19";
+my $vers="1.0.20";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -388,8 +388,9 @@ sub get_pkg_version {
     }
     chomp($pkgversion);
     if ( substr( $tcPkg,0,7 ) eq "cpanel-" ) {
-        $pkgversion =~ s/\-/\./g;
-        $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*|\.cp10.*|\.el.*|\+.*)//g;
+        $pkgversion =~ s/-\d+.cp\d+.*//a;
+        #$pkgversion =~ s/\-/\./g;
+        #$pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*|\.cp10.*|\.el.*|\+.*)//g;
     }
     else {
         $pkgversion =~ s/^\.\.//;
