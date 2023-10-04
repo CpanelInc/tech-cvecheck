@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.20";
+my $vers="1.0.21";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -31,9 +31,18 @@ my $list;
 my $OPT_TIMEOUT;
 
 
-# Create Global List to refer back to so we can stop calling exec() repeatedly & speed this thing up.
-# $pkg_list here is going to be an anonymous array so use it with @{$pkg_list}
-my $pkg_list = _get_pkg_list();
+my $pkg_list;
+if ( $distro eq 'ubuntu' ) {
+    open( STDERR, '>', '/dev/null' ) if ( ! $debug );
+    $pkg_list = Cpanel::SafeRun::Timed::timedsaferun( 0, 'dpkg-query', '-W', '-f${binary:Package}\n' );
+    close( STDERR ) if ( ! $debug );
+}
+else {
+    open( STDERR, '>', '/dev/null' ) if ( ! $debug );
+	$pkg_list = Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-qa', '--queryformat', '%{Name}\n' );
+    close( STDERR ) if ( ! $debug );
+}
+my @pkg_list = split /\n/, $pkg_list;
 
 GetOptions(
     'debug'       => \$debug,
@@ -162,18 +171,17 @@ foreach my $line( @{ $data } ) {
     if ( $package ) {
         next unless( $pkg eq $pkgtocheck );
         print MAGENTA "Checking only for " . BOLD YELLOW $pkgtocheck . "\n" if ( $debug && $show == 0 || $verbose && $show == 0 );
-        $show++;
+        $show=1;
     }
     if ( $cveid ) {
         next unless( $cve =~ m/$cvetocheck/ );
         print MAGENTA "Checking only for " . BOLD YELLOW $cvetocheck . "\n" if ( $debug && $show == 0 || $verbose && $show == 0 );
-        $show++;
+        $show=1;
     }
-    print BOLD WHITE "==================== [ " . YELLOW $pkg . " / " . $cve . BOLD WHITE " ] ====================\n" if ( $debug || $verbose );
     if ( is_os_vulnerable( $os_vuln ) == 0 ) {
-        print CYAN "Skipping " . YELLOW $pkg . CYAN " checks because this OS is " . GREEN "NOT vulnerable\n" if ( $debug || $verbose );
         next;
     }
+    print BOLD WHITE "==================== [ " . YELLOW $pkg . " / " . $cve . BOLD WHITE " ] ====================\n" if ( $debug || $verbose );
     # Check if package is installed
     print CYAN "Checking if " . YELLOW $pkg . " is installed: " if ( $debug || $verbose );
     my $installed = is_installed( $pkg );
@@ -366,8 +374,15 @@ sub found_in_changelog {
 
 sub is_installed {
     my $tcPkg = shift;
-    my $is_installed = grep{ /^${tcPkg}/ } @{$pkg_list};
-    return $is_installed ? 1 : 0;
+	my $is_installed=0;
+	foreach my $package(@pkg_list) {
+		chomp($package);
+		if ( $tcPkg eq $package ) {
+			$is_installed=1;
+			last;
+		}
+	}
+	return $is_installed;
 }
 
 sub get_pkg_version {
@@ -441,18 +456,3 @@ sub _version_cmp {
     return $a1 <=> $a2 || $b1 <=> $b2 || $c1 <=> $c2 || $d1 <=> $d2 || $e1 <=> $e2 || $f1 <=> $f2;
 }
 
-
-sub _get_pkg_list {
-    my $pkg_list = [];
-    if ( $distro eq 'ubuntu' ) {
-        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
-        @{$pkg_list} = split( /\n/, Cpanel::SafeRun::Timed::timedsaferun( 0, 'apt', 'list', '--installed' ) );
-        close( STDERR ) if ( ! $debug );
-    }
-    else {
-        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
-        @{$pkg_list} = split( /\n/, Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-qa' ) );
-        close( STDERR ) if ( ! $debug );
-    }
-    return $pkg_list;
-}
