@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.21";
+my $vers="1.0.22";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -231,6 +231,12 @@ foreach my $line( @{ $data } ) {
     my $in_changelog = ( $found_in_changelog ) ? "Yes - Patched" : "No " . WHITE "- Checking version numbers...";
     print GREEN $in_changelog . "\n" if ( $debug || $verbose );
     next unless( ! $found_in_changelog );
+
+    if ( $pkgver eq $patchedver ) {
+        print YELLOW "\t\\_ Running version matches patched version - Might be patched via backporting - must rely on changelog only!\n";
+        print CYAN "\tVersion " . YELLOW $pkgver . CYAN " of the " . GREEN $pkg . CYAN " package is " . RED "Vulnerable " . CYAN "to " . YELLOW $cve . "\n";
+        return;
+    }
 
     # check to see if version is greater than or equal to the patchedver variable
     my $op1='>=';
