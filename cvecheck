@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.22";
+my $vers="1.0.23";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -232,14 +232,8 @@ foreach my $line( @{ $data } ) {
     print GREEN $in_changelog . "\n" if ( $debug || $verbose );
     next unless( ! $found_in_changelog );
 
-    if ( $pkgver eq $patchedver ) {
-        print YELLOW "\t\\_ Running version matches patched version - Might be patched via backporting - must rely on changelog only!\n";
-        print CYAN "\tVersion " . YELLOW $pkgver . CYAN " of the " . GREEN $pkg . CYAN " package is " . RED "Vulnerable " . CYAN "to " . YELLOW $cve . "\n";
-        return;
-    }
-
     # check to see if version is greater than or equal to the patchedver variable
-    my $op1='>=';
+    my $op1='>';
     chomp($patchedver);
     if ( $pkg =~ m{openssl} ) {
         print CYAN "Checking if " . YELLOW $digitpkgver . " is " . MAGENTA $op1 . " " . YELLOW $patchedver . ": " if ( $debug || $verbose );
@@ -265,6 +259,9 @@ foreach my $line( @{ $data } ) {
     next if ( version_compare( $pkgver, $op2, $firstvuln ) );
 
     print CYAN "\tVersion " . YELLOW $pkgver . CYAN " of the " . GREEN $pkg . CYAN " package is " . RED "Vulnerable " . CYAN "to " . YELLOW $cve . "\n";
+    if ( $pkgver eq $patchedver ) {
+        print YELLOW "\t\t\\_ Running version matches patched version - Might be patched via backporting - But nothing was found in the changelog!\n";
+    }
 }
 
 if ( $file_option eq 'remote' ) {
@@ -380,15 +377,15 @@ sub found_in_changelog {
 
 sub is_installed {
     my $tcPkg = shift;
-	my $is_installed=0;
-	foreach my $package(@pkg_list) {
-		chomp($package);
-		if ( $tcPkg eq $package ) {
-			$is_installed=1;
-			last;
-		}
-	}
-	return $is_installed;
+    my $is_installed=0;
+    foreach my $package(@pkg_list) {
+        chomp($package);
+        if ( $tcPkg eq $package ) {
+            $is_installed=1;
+            last;
+        }
+    }
+    return $is_installed;
 }
 
 sub get_pkg_version {
@@ -410,13 +407,11 @@ sub get_pkg_version {
     chomp($pkgversion);
     if ( substr( $tcPkg,0,7 ) eq "cpanel-" ) {
         $pkgversion =~ s/-\d+.cp\d+.*//a;
-        #$pkgversion =~ s/\-/\./g;
-        #$pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|ubuntu.*|\.cp98.*|\.cp11.*|\.cp10.*|\.el.*|\+.*)//g;
     }
     else {
         $pkgversion =~ s/^\.\.//;
         $pkgversion =~ s/^\-\-//;
-        $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|\.1ubuntu.*|ubuntu.*|\.cp98.*|\.cp11.*|\.cp10.*|\.el.*|\+.*|\-.*)//g;
+        $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|\.1ubuntu.*|ubuntu.*|\.el.*|\.cp\d+.*|\+.*|\-.*)//g;
     }
     return $pkgversion;
 }
