@@ -39,7 +39,7 @@ if ( $distro eq 'ubuntu' ) {
 }
 else {
     open( STDERR, '>', '/dev/null' ) if ( ! $debug );
-	$pkg_list = Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-qa', '--queryformat', '%{Name}\n' );
+    $pkg_list = Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-qa', '--queryformat', '%{Name}\n' );
     close( STDERR ) if ( ! $debug );
 }
 my @pkg_list = split /\n/, $pkg_list;
