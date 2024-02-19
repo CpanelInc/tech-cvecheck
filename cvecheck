@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.23";
+my $vers="1.0.24";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -200,7 +200,7 @@ foreach my $line( @{ $data } ) {
     chomp( my $pkgver = get_pkg_version( $pkg ) );
     my $digitpkgver;
     my $alphapkgver;
-    $digitpkgver = digit_to_alpha( $pkgver ) // '' if ( $pkg =~ m{openssl} );
+    $digitpkgver = digit_to_alpha( $pkgver ) // '' if ( $pkg =~ m{openssl} && $pkgver < 3);
     chomp( $pkgver );
     if ( $pkgver eq "" ) {
         print RED "\n\t\\_ WARNING! - Version undefined/missing for $pkg\n";
@@ -209,7 +209,12 @@ foreach my $line( @{ $data } ) {
     }
     else {
         if ( $pkg =~ m{openssl} ) {
-            print GREEN $pkgver . " (Converted to: " . $digitpkgver . " )\n" if ( $debug || $verbose );
+	    	if ( $pkgver < 3 ) {
+            	print GREEN $pkgver . " (Converted to: " . $digitpkgver . " )\n" if ( $debug || $verbose );
+	    	}
+        	else {
+            	print GREEN $pkgver . "\n" if ( $debug || $verbose );
+        	}
         }
         else {
             print GREEN $pkgver . "\n" if ( $debug || $verbose );
@@ -217,8 +222,8 @@ foreach my $line( @{ $data } ) {
     }
 
     # report first vulnerable version (if verbose or debug is enabled)
-    $alphapkgver = alpha_to_digit( $firstvuln ) // '' if ( $pkg =~ m{openssl} );
-    if ( $pkg =~ m{openssl} ) {
+    $alphapkgver = alpha_to_digit( $firstvuln ) // '' if ( $pkg =~ m{openssl} && $pkgver < 3);
+    if ( $pkg =~ m{openssl} and $pkgver < 3) {
         print CYAN "First vulnerable reported version: " . GREEN $alphapkgver . " (Converted to: " . $firstvuln . " )\n" if ( $debug || $verbose );
     }
     else {
@@ -235,7 +240,7 @@ foreach my $line( @{ $data } ) {
     # check to see if version is greater than or equal to the patchedver variable
     my $op1='>';
     chomp($patchedver);
-    if ( $pkg =~ m{openssl} ) {
+    if ( $pkg =~ m{openssl} && $pkgver < 3) {
         print CYAN "Checking if " . YELLOW $digitpkgver . " is " . MAGENTA $op1 . " " . YELLOW $patchedver . ": " if ( $debug || $verbose );
     }
     else {
@@ -248,7 +253,7 @@ foreach my $line( @{ $data } ) {
     # check to see if version is less than the firstvuln variable
     my $op2='<';
     chomp($firstvuln);
-    if ( $pkg =~ m{openssl} ) {
+    if ( $pkg =~ m{openssl} && $pkgver < 3) {
         print CYAN "Checking if " . YELLOW $digitpkgver . " is " . MAGENTA $op2 . CYAN " the first vulnerable reported version of: " . YELLOW $firstvuln . ": " if ( $debug || $verbose );
     }
     else {
@@ -411,6 +416,7 @@ sub get_pkg_version {
     else {
         $pkgversion =~ s/^\.\.//;
         $pkgversion =~ s/^\-\-//;
+        $pkgversion =~ s/[a-zA-Z].*//g;
         $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|\.1ubuntu.*|ubuntu.*|\.el.*|\.cp\d+.*|\+.*|\-.*)//g;
     }
     return $pkgversion;
