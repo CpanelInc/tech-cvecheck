@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.24";
+my $vers="1.0.25";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -313,7 +313,8 @@ sub is_os_vulnerable {
         my ( $tcOSDist,$tcOSVer ) = (split( /\-/, $tcOSLine ));
         chomp( $tcOSDist);
         chomp( $tcOSVer);
-        my $op='>=';
+#        my $op='>=';
+        my $op='<';
         if ( $distro eq $tcOSDist ) {
             if ( version_compare( $distro_version, $op, $tcOSVer) ) {
                 $os_vulnerable=1;
