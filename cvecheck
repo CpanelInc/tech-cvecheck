@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.25";
+my $vers="1.0.26";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -251,7 +251,8 @@ foreach my $line( @{ $data } ) {
     next if ( version_compare( $pkgver, $op1, $patchedver ) );
 
     # check to see if version is less than the firstvuln variable
-    my $op2='<';
+    #my $op2='<';
+    my $op2='>';
     chomp($firstvuln);
     if ( $pkg =~ m{openssl} && $pkgver < 3) {
         print CYAN "Checking if " . YELLOW $digitpkgver . " is " . MAGENTA $op2 . CYAN " the first vulnerable reported version of: " . YELLOW $firstvuln . ": " if ( $debug || $verbose );
@@ -313,8 +314,8 @@ sub is_os_vulnerable {
         my ( $tcOSDist,$tcOSVer ) = (split( /\-/, $tcOSLine ));
         chomp( $tcOSDist);
         chomp( $tcOSVer);
-#        my $op='>=';
-        my $op='<';
+		my $op='>=';
+		#my $op='<';
         if ( $distro eq $tcOSDist ) {
             if ( version_compare( $distro_version, $op, $tcOSVer) ) {
                 $os_vulnerable=1;
