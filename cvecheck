@@ -209,12 +209,12 @@ foreach my $line( @{ $data } ) {
     }
     else {
         if ( $pkg =~ m{openssl} ) {
-	    	if ( $pkgver < 3 ) {
-            	print GREEN $pkgver . " (Converted to: " . $digitpkgver . " )\n" if ( $debug || $verbose );
-	    	}
-        	else {
-            	print GREEN $pkgver . "\n" if ( $debug || $verbose );
-        	}
+            if ( $pkgver < 3 ) {
+                print GREEN $pkgver . " (Converted to: " . $digitpkgver . " )\n" if ( $debug || $verbose );
+            }
+            else {
+                print GREEN $pkgver . "\n" if ( $debug || $verbose );
+            }
         }
         else {
             print GREEN $pkgver . "\n" if ( $debug || $verbose );
@@ -418,7 +418,7 @@ sub get_pkg_version {
     else {
         $pkgversion =~ s/^\.\.//;
         $pkgversion =~ s/^\-\-//;
-        $pkgversion =~ s/[a-zA-Z].*//g;
+        $pkgversion =~ s/[a-zA-Z].*//g unless( $tcPkg =~ m/openssl/ );
         $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|\.1ubuntu.*|ubuntu.*|\.el.*|\.cp\d+.*|\+.*|\-.*)//g;
     }
     return $pkgversion;
