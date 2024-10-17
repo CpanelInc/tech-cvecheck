@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.27";
+my $vers="1.0.28";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -413,7 +413,7 @@ sub get_pkg_version {
     $pkgversion =~ s/^\.\.//;
     $pkgversion =~ s/^\-\-//;
     $pkgversion =~ s/\-/\./g;
-    $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|\.deb.*|\.noarch|.1ubuntu.*|ubuntu.*|\.cp\d+.*|\.el.*|\+.*)//g;
+    $pkgversion =~ s/(\.x86_64|\.cpanel|\.cloudlinux|p2.*|\.deb.*|\.noarch|.1ubuntu.*|ubuntu.*|\.cp\d+.*|\.el.*|\+.*)//g;
 
     return $pkgversion;
 }
