@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.28";
+my $vers="1.0.29";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -266,6 +266,17 @@ foreach my $line( @{ $data } ) {
     print CYAN "\tVersion " . YELLOW $pkgver . CYAN " of the " . GREEN $pkg . CYAN " package is " . RED "Vulnerable " . CYAN "to " . YELLOW $cve . "\n";
     if ( $pkgver eq $patchedver ) {
         print YELLOW "\t\t\\_ Running version matches patched version - Might be patched via backporting - But nothing was found in the changelog!\n";
+    }
+    # Add check here for imunify360-ea-php-hardened (which is always behind).
+    if ( $distro ne 'ubuntu' ) {
+        my $pkginfo=Cpanel::SafeRun::Timed::timedsaferun( 0, 'dnf', 'info', $pkg );
+        my @pkginfo = split '\n', $pkginfo;
+        foreach my $infoline(@pkginfo) {
+            if ( $infoline =~ m{imunify360-ea-php-hardened} ) {
+                print MAGENTA "\t\t\\_ Note: $pkg is installed from the " . YELLOW "imunify360-ea-php-hardened" . MAGENTA " repo and may be behind on updates!\n";
+                last;
+            }
+        }
     }
 }
 
