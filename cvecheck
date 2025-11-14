@@ -242,6 +242,7 @@ foreach my $line( @{ $data } ) {
     chomp($patchedver);
     if ( $pkg =~ m{openssl} && $pkgver < 3) {
         print CYAN "Checking if " . YELLOW $digitpkgver . " is " . MAGENTA $op1 . " " . YELLOW $patchedver . ": " if ( $debug || $verbose );
+        $pkgver=$digitpkgver;
     }
     else {
         print CYAN "Checking if " . YELLOW $pkgver . " is " . MAGENTA $op1 . " " . YELLOW $patchedver . ": " if ( $debug || $verbose );
