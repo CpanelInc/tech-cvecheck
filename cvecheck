@@ -359,17 +359,19 @@ sub found_in_changelog {
     my $tcCVE = shift;
     my $in_chglog=0;
     my $in_chglog1=0;
+    my $in_chglog2=0;
     if ($distro eq "ubuntu" ) {
-        if ( ! -f "/usr/share/doc/$tcPkg/changelog.Debian.gz" ) {
-            print RED "\n\t\\_ WARNING! - /usr/share/doc/$tcPkg/changelog.Debian.gz IS MISSING!!! - ";
-            $in_chglog1=0;
-        }
-        else {
+        if ( -f "/usr/share/doc/$tcPkg/changelog.Debian.gz" ) {
             open( STDERR, '>', '/dev/null' ) if ( ! $debug );
             $in_chglog1 = ( Cpanel::SafeRun::Timed::timedsaferun( 0, 'zgrep', '-E', "$tcCVE", "/usr/share/doc/$tcPkg/changelog.Debian.gz" ) ) ? 1 : 0;
             close( STDERR ) if ( ! $debug );
-            $in_chglog=1 unless( $in_chglog1 == 0 );
         }
+        if ( -f "/usr/share/doc/$tcPkg/CHANGES.gz" ) {
+            open( STDERR, '>', '/dev/null' ) if ( ! $debug );
+            $in_chglog2 = ( Cpanel::SafeRun::Timed::timedsaferun( 0, 'zgrep', '-E', "$tcCVE", "/usr/share/doc/$tcPkg/CHANGES.gz" ) ) ? 1 : 0 unless( $in_chglog1 );
+            close( STDERR ) if ( ! $debug );
+        }
+        $in_chglog=1 unless( $in_chglog1 == 0 && $in_chglog2 == 0 );
     }
     else {
         open( STDERR, '>', '/dev/null' ) if ( ! $debug );
@@ -427,6 +429,8 @@ sub get_pkg_version {
     $pkgversion =~ s/^(?:\.\.|\-\-)//;
 #    print "DEBUG3: pkgversion=$pkgversion\n";
     $pkgversion =~ s/\-.*//;
+    $pkgversion =~ s/[0-9]\://;
+    $pkgversion =~ s/[a-z][0-9]//;
 #    $pkgversion =~ tr/-/./;
 #    print "DEBUG4: pkgversion=$pkgversion\n";
 #    $pkgversion =~ s/$tcPkg//g;
