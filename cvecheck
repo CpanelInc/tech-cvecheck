@@ -183,18 +183,27 @@ foreach my $line( @{ $data } ) {
     }
     print BOLD WHITE "==================== [ " . YELLOW $pkg . " / " . $cve . BOLD WHITE " ] ====================\n" if ( $debug || $verbose );
     # Check if package is installed
+    # Check if package is kernel or linux-headers (if so, uname -r must be added)
+    # NOTE: This MUST run before is_installed so the package name is resolved
+    # from the generic CVE name (e.g. "linux-headers") to the actual installed
+    # name (e.g. "linux-headers-6.8.0-47-generic") via uname -r.
+    print CYAN "Checking if " . YELLOW $pkg . " is a kernel/linux-header package: " if ( $debug || $verbose );
+    my $pkg1 = is_kernel( $pkg );
+    my $is_kernel = ( $pkg1 =~ m{kernel|linux-header} ) ? "Yes" : "No";
+    print GREEN $is_kernel . "\n" if ( $debug || $verbose );
+    $pkg=$pkg1;
+
     print CYAN "Checking if " . YELLOW $pkg . " is installed: " if ( $debug || $verbose );
     my $installed = is_installed( $pkg );
     my $is_installed = ( $installed ) ? "Yes" : "No";
     print GREEN $is_installed . "\n" if ( $debug || $verbose );
-    next unless( $installed );
-
-    # Check if package is kernel or linux-headers (if so, uname -r must be added)
-    print CYAN "Checking if " . YELLOW $pkg . " is a kernel/linux-header package: " if ( $debug || $verbose );
-    my $pkg1 = is_kernel( $pkg );        ## Checks to see if $pkg is a kernel or linux-headers pacakge!
-    my $is_kernel = ( $pkg1 =~ m{kernel|linux-header} ) ? "Yes" : "No";
-    print GREEN $is_kernel . "\n" if ( $debug || $verbose );
-    $pkg=$pkg1;
+    # RIGHT HERE
+    if ( $gl_is_kernel == 1 ) {
+        # Continue
+    }
+    else {
+        next unless( $installed );
+    }
     # If we get here, it is installed, now get the version number
     print CYAN "Getting version number of " . YELLOW $pkg . ": " if ( $debug || $verbose );
     chomp( my $pkgver = get_pkg_version( $pkg ) );
@@ -233,9 +242,21 @@ foreach my $line( @{ $data } ) {
     # check changelog for the CVE
     print CYAN "Checking to see if " . BOLD RED $cve . CYAN " for " . YELLOW $pkg . CYAN " is in the changelogs: " if ( $debug || $verbose );
     my $found_in_changelog = found_in_changelog( $pkg, $cve );
-    my $in_changelog = ( $found_in_changelog ) ? "Yes - Patched" : "No " . WHITE "- Checking version numbers...";
+    my $in_changelog;
+    $in_changelog = ( $found_in_changelog ) ? "Yes - Patched" : "No " . WHITE "- Checking via dnf updateinfo..." if ( $distro ne 'ubuntu' );
+    $in_changelog = ( $found_in_changelog ) ? "Yes - Patched" : "No " . WHITE "- Checking version numbers..." if ( $distro eq 'ubuntu' );
     print GREEN $in_changelog . "\n" if ( $debug || $verbose );
     next unless( ! $found_in_changelog );
+
+    # If not Ubuntu, check dnf updateinfo --quiet --list --all --cve
+    if ( $distro ne 'ubuntu' ) {
+    	print CYAN "Checking dnf updateinfo to see if " . BOLD RED $cve . CYAN " for " . YELLOW $pkg . CYAN " is found: " if ( $debug || $verbose );
+        my $patched = found_in_dnf_update( $cve );
+        # RIGHT HERE
+        my $in_dnf_update = ( $patched ) ? "Yes - Patched" : "No " . WHITE "- Checking version numbers...";
+        print GREEN $in_dnf_update . "\n" if ( $debug || $verbose );
+        next unless( $in_dnf_update );
+    }
 
     # check to see if version is greater than or equal to the patchedver variable
     my $op1='>';
@@ -404,6 +425,14 @@ sub is_installed {
         }
     }
     return $is_installed;
+}
+
+sub found_in_dnf_update {
+    my $tcCVE = shift;
+    # RIGHT HERE
+    my $IS_patched = Cpanel::SafeRun::Timed::timedsaferun( 0, 'dnf', 'updateinfo', '--quiet', '--list', '--all', '--cve', $tcCVE );
+    return 1 if ( $IS_patched );
+    return 0;
 }
 
 sub get_pkg_version {
