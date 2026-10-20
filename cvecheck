@@ -2,7 +2,7 @@
 
 use strict;
 
-my $vers="1.0.31";
+my $vers="1.0.32";
 
 use Cpanel::SafeRun::Timed();
 use JSON::PP;
@@ -81,6 +81,9 @@ if ( $help ) {
     print GREEN "\t5) If so, move on to the next package. If not, check the version of the installed package and see if it\n";
     print GREEN "\tis less than to the patched version.\n";
     print GREEN "\t6) If so, then not vulnerable.  If not, then list it as possibly being vulnerable.\n";
+    print GREEN "\nOpenSSL 1.x letter versions (e.g. 1.1.1w, 1.1.1za) are converted to numbers (1.1.1.23, 1.1.1.27).\n";
+    print GREEN "If the package has a release number (e.g. ea-openssl11 1.1.1w-10) it is appended (1.1.1.23.10).\n";
+    print GREEN "A cve_data.json version of 1.1.1.23 matches any release of 1.1.1w; 1.1.1.23.10 is release-aware.\n";
     print "\n";
     exit;
 }
@@ -207,33 +210,33 @@ foreach my $line( @{ $data } ) {
     # If we get here, it is installed, now get the version number
     print CYAN "Getting version number of " . YELLOW $pkg . ": " if ( $debug || $verbose );
     chomp( my $pkgver = get_pkg_version( $pkg ) );
-    my $digitpkgver;
-    my $alphapkgver;
-    $digitpkgver = digit_to_alpha( $pkgver ) // '' if ( $pkg =~ m{openssl} && $pkgver < 3);
-    chomp( $pkgver );
     if ( $pkgver eq "" ) {
         print RED "\n\t\\_ WARNING! - Version undefined/missing for $pkg\n";
         print MAGENTA "\t\\_ THIS SHOULD NOT BE POSSIBLE IF THE PACKAGE IS PROPERLY INSTALLED! - Exiting.\n";
         exit;
     }
+
+    # OpenSSL 1.x uses letter suffixes (1.1.1w, 1.1.1za) and, for packages such as
+    # ea-openssl11, a release number once the letters ran out (1.1.1w-10).
+    # Convert both into a purely numeric version (1.1.1.23.10) so version_compare() works.
+    my $legacy_ssl  = ( $pkg =~ m{openssl} && $pkgver =~ m{^1\.} ) ? 1 : 0;
+    my $pkgrel      = ( $legacy_ssl && $distro ne 'ubuntu' ) ? get_pkg_release( $pkg ) : '';
+    my $digitpkgver = '';
+
+    if ( $legacy_ssl ) {
+        $digitpkgver = digit_to_alpha( $pkgver, $pkgrel ) // '';
+        # cve_data.json may hold either the letter form (1.1.1w / 1.1.1w-10) or the digit form (1.1.1.23 / 1.1.1.23.10)
+        $patchedver = digit_to_alpha( $patchedver ) // $patchedver if ( defined $patchedver && $patchedver =~ /[a-z]/ );
+        $firstvuln  = digit_to_alpha( $firstvuln )  // $firstvuln  if ( defined $firstvuln  && $firstvuln  =~ /[a-z]/ );
+        print GREEN $pkgver . ( $pkgrel ne '' ? "-$pkgrel" : '' ) . " (Converted to: " . $digitpkgver . " )\n" if ( $debug || $verbose );
+    }
     else {
-        if ( $pkg =~ m{openssl} ) {
-            if ( $pkgver < 3 ) {
-                print GREEN $pkgver . " (Converted to: " . $digitpkgver . " )\n" if ( $debug || $verbose );
-            }
-            else {
-                print GREEN $pkgver . "\n" if ( $debug || $verbose );
-            }
-        }
-        else {
-            print GREEN $pkgver . "\n" if ( $debug || $verbose );
-        }
+        print GREEN $pkgver . "\n" if ( $debug || $verbose );
     }
 
     # report first vulnerable version (if verbose or debug is enabled)
-    $alphapkgver = alpha_to_digit( $firstvuln ) // '' if ( $pkg =~ m{openssl} && $pkgver < 3);
-    if ( $pkg =~ m{openssl} and $pkgver < 3) {
-        print CYAN "First vulnerable reported version: " . GREEN $alphapkgver . " (Converted to: " . $firstvuln . " )\n" if ( $debug || $verbose );
+    if ( $legacy_ssl ) {
+        print CYAN "First vulnerable reported version: " . GREEN alpha_to_digit( $firstvuln ) . " (Converted to: " . $firstvuln . " )\n" if ( $debug || $verbose );
     }
     else {
         print CYAN "First vulnerable reported version: " . GREEN $firstvuln . "\n" if ( $debug || $verbose );
@@ -255,38 +258,34 @@ foreach my $line( @{ $data } ) {
         # RIGHT HERE
         my $in_dnf_update = ( $patched ) ? "Yes - Patched" : "No " . WHITE "- Checking version numbers...";
         print GREEN $in_dnf_update . "\n" if ( $debug || $verbose );
+        # NOTE: $in_dnf_update is always a non-empty string, so this never skips.
+        # Behaviour left unchanged on purpose; see notes delivered with this script.
         next unless( $in_dnf_update );
     }
 
-    # check to see if version is greater than or equal to the patchedver variable
+    # check to see if version is greater than the patchedver variable
     my $op1='>';
     chomp($patchedver);
-    if ( $pkg =~ m{openssl} && $pkgver < 3) {
-        print CYAN "Checking if " . YELLOW $digitpkgver . " is " . MAGENTA $op1 . " " . YELLOW $patchedver . ": " if ( $debug || $verbose );
-        $pkgver=$digitpkgver;
-    }
-    else {
-        print CYAN "Checking if " . YELLOW $pkgver . " is " . MAGENTA $op1 . " " . YELLOW $patchedver . ": " if ( $debug || $verbose );
-    }
-    my $vercmp = ( version_compare( $pkgver, $op1, $patchedver ) ) ? "Yes - Patched" : "No";
-    print GREEN $vercmp . "\n" if ( $debug || $verbose );
-    next if ( version_compare( $pkgver, $op1, $patchedver ) );
+    # Compare only as many components as the data entry specifies, so an entry of
+    # 1.1.1.23 matches every release of 1.1.1w, while 1.1.1.23.10 is release-aware.
+    my $cmp_patched = $legacy_ssl ? trim_to_depth( $digitpkgver, $patchedver ) : $pkgver;
+    print CYAN "Checking if " . YELLOW $cmp_patched . " is " . MAGENTA $op1 . " " . YELLOW $patchedver . ": " if ( $debug || $verbose );
+    my $is_patched = ( version_compare( $cmp_patched, $op1, $patchedver ) ) ? 1 : 0;
+    print GREEN ( $is_patched ? "Yes - Patched" : "No" ) . "\n" if ( $debug || $verbose );
+    next if ( $is_patched );
 
-    # check to see if version is less than the firstvuln variable
+    # check to see if version is greater than the firstvuln variable
     my $op2='>';
     chomp($firstvuln);
-    if ( $pkg =~ m{openssl} && $pkgver < 3) {
-        print CYAN "Checking if " . YELLOW $digitpkgver . " is " . MAGENTA $op2 . CYAN " the first vulnerable reported version of: " . YELLOW $firstvuln . ": " if ( $debug || $verbose );
-    }
-    else {
-        print CYAN "Checking if " . YELLOW $pkgver . " is " . MAGENTA $op2 . CYAN " the first vulnerable reported version of: " . YELLOW $firstvuln . ": " if ( $debug || $verbose );
-    }
-    my $vercmp = ( version_compare( $pkgver, $op2, $firstvuln ) ) ? "Yes - Patched" : "No";
-    print GREEN $vercmp . "\n" if ( $debug || $verbose );
-    next if ( version_compare( $pkgver, $op2, $firstvuln ) );
+    my $cmp_first = $legacy_ssl ? trim_to_depth( $digitpkgver, $firstvuln ) : $pkgver;
+    print CYAN "Checking if " . YELLOW $cmp_first . " is " . MAGENTA $op2 . CYAN " the first vulnerable reported version of: " . YELLOW $firstvuln . ": " if ( $debug || $verbose );
+    my $is_newer = ( version_compare( $cmp_first, $op2, $firstvuln ) ) ? 1 : 0;
+    print GREEN ( $is_newer ? "Yes - Patched" : "No" ) . "\n" if ( $debug || $verbose );
+    next if ( $is_newer );
 
-    print CYAN "\tVersion " . YELLOW $pkgver . CYAN " of the " . GREEN $pkg . CYAN " package is " . RED "Vulnerable " . CYAN "to " . YELLOW $cve . "\n";
-    if ( $pkgver eq $patchedver ) {
+    my $shown_ver = $legacy_ssl ? $digitpkgver : $pkgver;
+    print CYAN "\tVersion " . YELLOW $shown_ver . CYAN " of the " . GREEN $pkg . CYAN " package is " . RED "Vulnerable " . CYAN "to " . YELLOW $cve . "\n";
+    if ( $legacy_ssl ? ( trim_to_depth( $digitpkgver, $patchedver ) eq $patchedver ) : ( $pkgver eq $patchedver ) ) {
         print YELLOW "\t\t\\_ Running version matches patched version - Might be patched via backporting - But nothing was found in the changelog!\n";
     }
     # Add check here for imunify360-ea-php-hardened (which is always behind).
@@ -308,29 +307,70 @@ if ( $file_option eq 'remote' ) {
 print "\n";
 exit;
 
+# Convert an OpenSSL 1.x letter version (plus optional release) into a numeric one.
+#   "1.1.1w"    => "1.1.1.23"
+#   "1.1.1za"   => "1.1.1.27"       (z=26, then za=27, zb=28 ...)
+#   "1.1.1w-10" => "1.1.1.23.10"
+#   "1.1.1"     => "1.1.1.0"
+# An explicit release may be passed as the second argument (it wins over one embedded in the string).
+# The result is compatible with version_compare().
 sub digit_to_alpha {
-    my $tcPkgVer = shift;
-    return unless ( $tcPkgVer =~ /(\d+)\.(\d+)\.(\d+)([a-z])([a-z]?)/ );
-    my $retPkgVer;
-    my ( $maj, $min, $patch ) = ( $1, $2, $3 );
-    # If we map the alphas into a number and sum the values the version will be compatible with version_compare()
-    # and save us a lot of trouble, i.e. h=8, m=13, and za=27
-    my %al2num = map { ( "a" .. "z" )[ $_ - 1 ] => $_ } ( 1 .. 26 );
+    my ( $tcPkgVer, $tcRelease ) = @_;
+    return unless defined $tcPkgVer;
+    return unless $tcPkgVer =~ /^(\d+)\.(\d+)\.(\d+)(?:([a-z])([a-z]?))?(?:-(\d+))?/;
+    my ( $maj, $min, $patch, $l1, $l2, $rel ) = ( $1, $2, $3, $4, $5, $6 );
+    $tcRelease = $rel unless ( defined $tcRelease && $tcRelease ne '' );
+
     my $sub = 0;
-    if ($4) { $sub += $al2num{ lc($4) } }
-    if ($5) { $sub += $al2num{ lc($5) } }
-    $retPkgVer = join( '.', $maj, $min, $patch, $sub );
-    return $retPkgVer;
+    $sub += ord( lc $l1 ) - 96 if ( defined $l1 && $l1 ne '' );
+    $sub += ord( lc $l2 ) - 96 if ( defined $l2 && $l2 ne '' );
+
+    my @parts = ( $maj, $min, $patch, $sub );
+    push @parts, $tcRelease if ( defined $tcRelease && $tcRelease ne '' );
+    return join( '.', @parts );
 }
 
+# 1 => a ... 26 => z, 27 => za ... 52 => zz
+sub num_to_alpha {
+    my $n = shift;
+    return ''                        if ( !$n || $n < 1 );
+    return chr( 96 + $n )            if ( $n <= 26 );
+    return 'z' . chr( 96 + $n - 26 ) if ( $n <= 52 );
+    return 'zz';    # out of range, clamp
+}
+
+# Convert a numeric version back to its letter form.
+#   "1.1.1.23"    => "1.1.1w"
+#   "1.1.1.27"    => "1.1.1za"
+#   "1.1.1.23.10" => "1.1.1w-10"
 sub alpha_to_digit {
     my $tcPkgVer = shift;
-    my @letters = ( "a" .. "z" );
-    my $retPkgVer;
-    my ( $maj, $min, $patch, $sub ) = ( split( /\./, $tcPkgVer ) );
-    my $sub1 = $letters[ $sub - 1 ];
-    $retPkgVer = join( '.', $maj, $min, $patch );
-    $retPkgVer .= $sub1;
+    return $tcPkgVer unless defined $tcPkgVer;
+    my ( $maj, $min, $patch, $sub, $rel ) = split( /\./, $tcPkgVer );
+    return $tcPkgVer unless ( defined $patch );
+    my $ret = join( '.', $maj, $min, $patch ) . num_to_alpha( $sub );
+    $ret .= "-$rel" if ( defined $rel && $rel ne '' );
+    return $ret;
+}
+
+# Release number of an installed rpm (e.g. "10.cp1186" => 10)
+sub get_pkg_release {
+    my $tcPkg = shift;
+    open( STDERR, '>', '/dev/null' ) if ( ! $debug );
+    my $rel = Cpanel::SafeRun::Timed::timedsaferun( 0, 'rpm', '-q', '--queryformat', '%{Release}', $tcPkg );
+    close( STDERR ) if ( ! $debug );
+    return ( defined $rel && $rel =~ /^(\d+)/ ) ? $1 : '';
+}
+
+# Cut $ver down to the same number of components as $ref.
+sub trim_to_depth {
+    my ( $ver, $ref ) = @_;
+    return $ver unless ( defined $ver && defined $ref );
+    my @r = split /[\._]/, $ref;
+    my $depth = scalar( @r );
+    my @v = split /[\._]/, $ver;
+    splice( @v, $depth ) if ( @v > $depth );
+    return join( '.', @v );
 }
 
 sub is_os_vulnerable {
@@ -457,6 +497,7 @@ sub get_pkg_version {
 #    print "DEBUG2: pkgversion=$pkgversion\n";
     $pkgversion =~ s/^(?:\.\.|\-\-)//;
 #    print "DEBUG3: pkgversion=$pkgversion\n";
+    # NOTE: this drops the release (e.g. "-10"); get_pkg_release() fetches it separately where needed.
     $pkgversion =~ s/\-.*//;
     $pkgversion =~ s/[0-9]\://;
     $pkgversion =~ s/[a-z][0-9]//;
@@ -474,7 +515,7 @@ sub get_pkg_version {
 
 sub version_compare {
     # example: return if version_compare($ver_string, qw( >= 1.2.3.3 ));
-    # Must be no more than four version numbers separated by periods and/or underscores.
+    # Must be no more than six version numbers separated by periods and/or underscores.
     my ( $ver1, $mode, $ver2 ) = @_;
     return if ( !defined($ver1) || ( $ver1 =~ /[^\._0-9]/ ) );
     return if ( !defined($ver2) || ( $ver2 =~ /[^\._0-9]/ ) );
