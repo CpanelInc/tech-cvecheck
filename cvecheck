@@ -15,6 +15,7 @@ use Text::Tabs;
 $tabstop = 4;
 use File::Temp;
 my $gl_is_kernel=0;
+my $kcare_patchinfo;    # cached output of: kcarectl --patch-info
 my $distro       = Cpanel::OS->_instance->distro;
 my $distro_major = Cpanel::OS->_instance->major;
 my $distro_minor = Cpanel::OS->_instance->minor;
@@ -200,7 +201,6 @@ foreach my $line( @{ $data } ) {
     my $installed = is_installed( $pkg );
     my $is_installed = ( $installed ) ? "Yes" : "No";
     print GREEN $is_installed . "\n" if ( $debug || $verbose );
-    # RIGHT HERE
     if ( $gl_is_kernel == 1 ) {
         # Continue
     }
@@ -253,14 +253,19 @@ foreach my $line( @{ $data } ) {
 
     # If not Ubuntu, check dnf updateinfo --quiet --list --all --cve
     if ( $distro ne 'ubuntu' ) {
-    	print CYAN "Checking dnf updateinfo to see if " . BOLD RED $cve . CYAN " for " . YELLOW $pkg . CYAN " is found: " if ( $debug || $verbose );
+        print CYAN "Checking dnf updateinfo to see if " . BOLD RED $cve . CYAN " for " . YELLOW $pkg . CYAN " is found: " if ( $debug || $verbose );
         my $patched = found_in_dnf_update( $cve );
-        # RIGHT HERE
         my $in_dnf_update = ( $patched ) ? "Yes - Patched" : "No " . WHITE "- Checking version numbers...";
         print GREEN $in_dnf_update . "\n" if ( $debug || $verbose );
-        # NOTE: $in_dnf_update is always a non-empty string, so this never skips.
-        # Behaviour left unchanged on purpose; see notes delivered with this script.
-        next unless( $in_dnf_update );
+        next if ( $patched );
+    }
+
+    # Kernel/linux-header packages only: last fallback is KernelCare (kcarectl --patch-info)
+    if ( $gl_is_kernel == 1 && kernelcare_installed() ) {
+        print CYAN "Checking KernelCare --patch-info to see if " . BOLD RED $cve . CYAN " is patched: " if ( $debug || $verbose );
+        my $kcare_patched = found_in_kernelcare( $cve );
+        print GREEN ( $kcare_patched ? "Yes - Patched via KernelCare" : "No " . WHITE "- Checking version numbers..." ) . "\n" if ( $debug || $verbose );
+        next if ( $kcare_patched );
     }
 
     # check to see if version is greater than the patchedver variable
@@ -440,17 +445,6 @@ sub found_in_changelog {
         close( STDERR ) if ( ! $debug );
         $in_chglog = ( grep { /$tcCVE/ } $in_chglog1 ) ? 1 : 0;
     }
-    # If not found in changelog via regular methods - See if KernelCare is installed and check using --patch-info
-    if ( $in_chglog == 0 && $gl_is_kernel == 1 ) {
-        return $in_chglog unless( -x '/usr/bin/kcarectl' );
-        print BOLD GREEN "\n\t\\_ Not found via regular changelog, KernelCare detected - Checking with --patch-info: " if ( $verbose || $debug );
-        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
-        my $patchinfo = Cpanel::SafeRun::Timed::timedsaferun(3, 'kcarectl', '--patch-info' );
-        close( STDERR ) if ( ! $debug );
-        my @patchinfo = split /\n/, $patchinfo;
-        my $in_chglog = ( grep { /$tcCVE/ } @patchinfo ) ? 1 : 0;
-        return $in_chglog;
-    }
     return $in_chglog;
 }
 
@@ -473,6 +467,24 @@ sub found_in_dnf_update {
     my $IS_patched = Cpanel::SafeRun::Timed::timedsaferun( 0, 'dnf', 'updateinfo', '--quiet', '--list', '--all', '--cve', $tcCVE );
     return 1 if ( $IS_patched );
     return 0;
+}
+
+sub kernelcare_installed {
+    return ( -x '/usr/bin/kcarectl' ) ? 1 : 0;
+}
+
+# Returns 1 if KernelCare has a patch for the CVE (kpatch-cve: CVE-XXXX-XXXXX), else 0.
+# --patch-info is slow, so run it once and cache the output.
+sub found_in_kernelcare {
+    my $tcCVE = shift;
+    return 0 unless ( kernelcare_installed() );
+    if ( ! defined $kcare_patchinfo ) {
+        open( STDERR, '>', '/dev/null' ) if ( ! $debug );
+        $kcare_patchinfo = Cpanel::SafeRun::Timed::timedsaferun( 30, 'kcarectl', '--patch-info' );
+        close( STDERR ) if ( ! $debug );
+        $kcare_patchinfo = '' unless ( defined $kcare_patchinfo );
+    }
+    return ( grep { /\Q$tcCVE\E/ } split( /\n/, $kcare_patchinfo ) ) ? 1 : 0;
 }
 
 sub get_pkg_version {
